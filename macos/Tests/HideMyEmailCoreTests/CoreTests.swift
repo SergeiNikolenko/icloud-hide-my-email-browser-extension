@@ -49,6 +49,24 @@ import Testing
     }
 }
 
+@Suite struct SignInTests {
+    @Test func recognizesSignInForms() {
+        let apple = FieldDescriptor(role: "AXTextField", roleDescription: "email", placeholder: "Email or Phone Number")
+        #expect(EmailField.isSignIn(apple, pageTitle: "Sign in to your Apple Account", url: nil))
+        let oracle = FieldDescriptor(role: "AXTextField", title: "Username or email")
+        #expect(EmailField.isSignIn(oracle, pageTitle: nil, url: URL(string: "https://login.oracle.com/mysso")))
+        let byPath = FieldDescriptor(role: "AXTextField", roleDescription: "email", title: "Email")
+        #expect(EmailField.isSignIn(byPath, pageTitle: "Acme", url: URL(string: "https://acme.com/login")))
+    }
+
+    @Test func keepsSignUpAndPlainEmailForms() {
+        let email = FieldDescriptor(role: "AXTextField", roleDescription: "email", title: "Email")
+        #expect(!EmailField.isSignIn(email, pageTitle: "Create your account", url: URL(string: "https://acme.com/signup")))
+        #expect(!EmailField.isSignIn(email, pageTitle: "Checkout", url: URL(string: "https://shop.com/checkout")))
+        #expect(!EmailField.isSignIn(email, pageTitle: "Sign up or log in", url: nil))
+    }
+}
+
 @Suite struct EmailFieldTests {
     @Test func chromiumEmailInput() {
         #expect(EmailField.isEmailField(FieldDescriptor(role: "AXTextField", roleDescription: "email")))

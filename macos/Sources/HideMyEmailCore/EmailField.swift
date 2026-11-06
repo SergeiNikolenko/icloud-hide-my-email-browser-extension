@@ -51,4 +51,25 @@ public enum EmailField {
         // Placeholders such as "you@example.com".
         return field.placeholder.map { $0.range(of: #"\S+@\S+\.\S+"#, options: .regularExpression) != nil } ?? false
     }
+
+    static let signUpHints = [
+        "sign up", "sign-up", "signup", "register", "registration", "create account", "create an account",
+        "create-account", "join", "регистрац", "создать", "subscribe", "newsletter", "подпис",
+    ]
+    static let signInHints = [
+        "sign in", "sign-in", "signin", "log in", "log-in", "login", "username", "user name", "phone",
+        "apple account", "apple id", "войти", "вход", "логин", "телефон",
+    ]
+
+    /// Whether a field asks for an existing account rather than a new one, judged
+    /// from its labels and the page title and path. A sign-up hint anywhere wins.
+    public static func isSignIn(_ field: FieldDescriptor, pageTitle: String?, url: URL?) -> Bool {
+        let fieldText = [field.identifier, field.title, field.placeholder, field.label]
+            .compactMap { $0?.lowercased() }.joined(separator: " ")
+        let pageText = [pageTitle?.lowercased(), url.map { "\($0.path) \($0.query ?? "")".lowercased() }]
+            .compactMap { $0 }.joined(separator: " ")
+        let text = fieldText + " " + pageText
+        if signUpHints.contains(where: text.contains) { return false }
+        return signInHints.contains(where: text.contains)
+    }
 }

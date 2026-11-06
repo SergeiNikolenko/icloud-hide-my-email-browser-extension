@@ -21,7 +21,10 @@ final class SuggestionPanel {
 
     private let state = SuggestionState()
     private var field: AXUIElement?
+    private var anchor: CGRect = .zero
+    private var placesAbove = false
     private var generation: Task<Void, Never>?
+    private var watch: Task<Void, Never>?
     private lazy var panel: NSPanel = {
         let panel = NSPanel(contentRect: .zero, styleMask: [.nonactivatingPanel, .borderless],
                             backing: .buffered, defer: true)
@@ -48,6 +51,8 @@ final class SuggestionPanel {
     func show(for element: AXUIElement, anchor: CGRect) {
         let isSameField = field.map { CFEqual($0, element) } ?? false
         field = element
+        self.anchor = anchor
+        if !isSameField { placesAbove = false }
         state.site = model.context?.site
         state.existing = Array(model.siteAddresses.prefix(3))
         state.error = nil
@@ -59,19 +64,63 @@ final class SuggestionPanel {
             }
         }
 
+        layout()
+        watch?.cancel()
+        watch = Task { [weak self] in
+            // Passwords and browsers open their AutoFill lists under the field a
+            // moment after focus; make room for them instead of covering them.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard let self, self.field != nil else { return }
+                if !self.placesAbove, self.isBelowFieldTaken() {
+                    self.placesAbove = true
+                    self.layout()
+                }
+            }
+        }
+    }
+
+    private func layout() {
         let size = panel.contentView?.fittingSize ?? CGSize(width: 300, height: 60)
         let width = max(min(max(anchor.width, 280), 380), size.width)
         let screen = NSScreen.screens.first { $0.frame.intersects(anchor) } ?? NSScreen.main
-        var origin = CGPoint(x: anchor.minX, y: anchor.minY - size.height - 4)
-        if let visible = screen?.visibleFrame {
-            if origin.y < visible.minY { origin.y = anchor.maxY + 4 }
-            origin.x = min(max(origin.x, visible.minX + 8), visible.maxX - width - 8)
+        let visible = screen?.visibleFrame ?? .infinite
+        let below = anchor.minY - size.height - 4
+        let above = anchor.maxY + 4
+        let fitsAbove = above + size.height <= visible.maxY
+        guard !placesAbove || fitsAbove else {
+            panel.orderOut(nil)
+            return
         }
-        panel.setFrame(CGRect(origin: origin, size: CGSize(width: width, height: size.height)), display: true)
+        let y = placesAbove || below < visible.minY ? above : below
+        let x = min(max(anchor.minX, visible.minX + 8), visible.maxX - width - 8)
+        panel.setFrame(CGRect(x: x, y: y, width: width, height: size.height), display: true)
         panel.orderFrontRegardless()
     }
 
+    /// Whether another app's popup, such as the Passwords AutoFill list, sits
+    /// right under the field.
+    private func isBelowFieldTaken() -> Bool {
+        guard let primary = NSScreen.screens.first else { return false }
+        // CGWindowList uses top-left coordinates on the primary screen.
+        let strip = CGRect(x: anchor.minX, y: primary.frame.maxY - anchor.minY,
+                           width: max(anchor.width, 280), height: 160)
+        let systemLayers = [CGWindowLevelKey.mainMenuWindow, .statusWindow, .dockWindow]
+            .map { Int(CGWindowLevelForKey($0)) }
+        let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+            as? [[String: Any]] ?? []
+        return windows.contains { info in
+            guard (info[kCGWindowOwnerPID as String] as? pid_t) != getpid(),
+                  let layer = info[kCGWindowLayer as String] as? Int, layer > 0, !systemLayers.contains(layer),
+                  let bounds = (info[kCGWindowBounds as String] as? NSDictionary)
+                      .flatMap({ CGRect(dictionaryRepresentation: $0) })
+            else { return false }
+            return bounds.height < 700 && bounds.width < 900 && bounds.intersects(strip)
+        }
+    }
+
     func hide() {
+        watch?.cancel()
         generation?.cancel()
         field = nil
         state.isWorking = false

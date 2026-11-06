@@ -74,6 +74,16 @@ enum AX {
         return attribute(node, kAXURLAttribute, as: String.self).flatMap(URL.init(string:))
     }
 
+    /// The title of the page that contains an element, or else of its window.
+    static func pageTitle(containing element: AXUIElement, pid: pid_t) -> String? {
+        let titles = [
+            webArea(containing: element).flatMap { attribute($0, kAXTitleAttribute, as: String.self) },
+            Self.element(AXUIElementCreateApplication(pid), kAXFocusedWindowAttribute)
+                .flatMap { attribute($0, kAXTitleAttribute, as: String.self) },
+        ].compactMap { $0 }.filter { !$0.isEmpty }
+        return titles.isEmpty ? nil : titles.joined(separator: " ")
+    }
+
     /// The URL of the frontmost page in an app's focused window.
     static func frontPageURL(pid: pid_t) -> URL? {
         if let focused = focusedElement(pid: pid), let url = pageURL(containing: focused) { return url }

@@ -81,7 +81,9 @@ final class FieldWatcher {
             return
         }
         let field = AX.descriptor(focused)
-        guard EmailField.isEmailField(field), (field.value ?? "").isEmpty else {
+        // Sign-in forms want an existing account, which Passwords already offers.
+        guard EmailField.isEmailField(field), (field.value ?? "").isEmpty,
+              !EmailField.isSignIn(field, pageTitle: AX.pageTitle(containing: focused, pid: pid), url: url) else {
             SuggestionPanel.shared.hide()
             return
         }

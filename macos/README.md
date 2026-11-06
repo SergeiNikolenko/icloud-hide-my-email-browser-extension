@@ -6,7 +6,9 @@ fields). Safari is left alone because it has Hide My Email built in.
 
 - **Suggestions in email fields.** When an email field gets focus in any app,
   a Liquid Glass panel appears under it with a fresh address for the site and
-  the addresses you already use there. Click one to fill the field.
+  the addresses you already use there. Click one to fill the field. Sign-in
+  forms are left to Passwords, and the panel moves above the field when
+  Passwords or the browser open their own AutoFill list under it.
 - **Create and fill shortcut.** Press ⌃⌥E (configurable) to create an address
   labelled after the current site and type it into the focused field, or copy
   it when nothing editable has focus.
