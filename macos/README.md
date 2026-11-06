@@ -4,6 +4,10 @@ A menu bar app that brings iCloud Hide My Email to every browser and app on the
 Mac (Zen, Firefox, Arc, Chrome, the Codex browser and anything else with text
 fields). Safari is left alone because it has Hide My Email built in.
 
+<p align="center">
+<img src="../docs/images/addresses.png" alt="Addresses window" width="900"/>
+</p>
+
 - **Suggestions in email fields.** When an email field gets focus in any app,
   a Liquid Glass panel appears under it with a fresh address for the site and
   the addresses you already use there. Click one to fill the field. Sign-in
@@ -53,6 +57,10 @@ Requires macOS 26 or later and Xcode 26 or later.
 ./scripts/release.sh            # publishes the version in Resources/Info.plist
 swift test                      # core tests
 ```
+
+Launching the app with `--demo` shows sample addresses without signing in
+and opens the Addresses window, the menu and the field suggestions in
+floating windows. The screenshots in this repository come from that mode.
 
 The app needs Accessibility access to read focused fields and to type
 addresses. It never reads passwords: secure text fields are ignored.

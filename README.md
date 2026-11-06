@@ -1,8 +1,35 @@
-# iCloud Hide My Email Browser Extension
+# iCloud Hide My Email for Mac and browsers
+
+[Hide My Email](https://support.apple.com/en-us/HT210425) is the iCloud+ service that gives every site its own random address forwarding to your inbox. Safari offers one whenever you sign up somewhere; this project brings the same experience to every other browser and app.
+
+<p align="center">
+<img src="./docs/images/hero.jpg" alt="Hide My Email for macOS: the Addresses window, the menu bar window and suggestions under an email field" width="900"/>
+</p>
+
+## Hide My Email for macOS
+
+A native menu bar app that works in Zen, Firefox, Arc, Chrome and any other app with text fields, no browser extension required.
+
+- **Suggestions in email fields.** Focus an email field anywhere and a Liquid Glass panel offers a fresh address for the site, plus the ones you already use there. One click fills the field.
+- **⌃⌥E** creates an address labelled after the current site and types it in.
+- **Menu bar** for generating, labelling and searching addresses, and pasting them into the app you came from.
+- **Addresses window** with every address on the account, including ones made in Safari or on other devices: per-site filters with real site icons, label and note editing, bulk deactivate, reactivate and delete, CSV and JSON export.
+- **Sign-in through your browser**, so passkeys and two-factor authentication work as usual. The app never asks for your Apple ID password and needs no Full Disk Access.
+
+<p align="center">
+<img src="./docs/images/suggestion.png" alt="Suggestions under an email field" width="330"/>
+<img src="./docs/images/menu.png" alt="Menu bar window" width="330"/>
+</p>
+
+Download `HideMyEmail.dmg` from the [latest release](https://github.com/SergeiNikolenko/icloud-hide-my-email-browser-extension/releases/latest). It needs macOS 26 or later and an iCloud+ subscription, and updates itself. See [`macos/`](macos/README.md) for setup and build instructions.
+
+## Browser extension
 
 [![Tests Status](https://github.com/dedoussis/icloud-hide-my-email-browser-extension/workflows/tests/badge.svg)](https://github.com/dedoussis/icloud-hide-my-email-browser-extension/actions/workflows/tests.yml)
 
-[Hide My Email](https://support.apple.com/en-us/HT210425) is a premium privacy service of iCloud. Safari offers a native integration with Hide My Email, whereby users are prompted to generate a Hide My Email address upon registration to any website. This extension aims to bring a similar UX into a wider variety of browsers. In particular, it has been explicitly tested to work on:
+The extension comes from [dedoussis/icloud-hide-my-email-browser-extension](https://github.com/dedoussis/icloud-hide-my-email-browser-extension). This fork restyles it after native macOS materials, with light and dark themes, an address manager with search, editing and deletion confirmation, and a field button that no longer shifts page layouts. It also fixes autofill in iframes and repeated fields, replies to the tab that asked, keeps the session through network errors and drops the broad `tabs` permission.
+
+The upstream extension has been tested on:
 
 - [Chrome](https://chrome.google.com/webstore/detail/icloud-hide-my-email/omiaekblhgfopjkjnenhahfgcgnbohlk)
 - [Firefox](https://addons.mozilla.org/en-US/firefox/addon/icloud-hide-my-email/)
@@ -10,12 +37,6 @@
 - Microsoft Edge
 
 Note that the extension _should_ work on any browser that implements the [extension API](https://developer.chrome.com/docs/extensions/reference/) supported by Chromium-based browsers.
-
-## About this fork
-
-This fork restyles the extension after native macOS materials, with light and dark themes, an address manager with search, editing and deletion confirmation, and a field button that no longer shifts page layouts. It also fixes autofill in iframes and repeated fields, replies to the tab that asked, keeps the session through network errors and drops the broad `tabs` permission.
-
-[`macos/`](macos/README.md) contains a native menu bar app that brings Hide My Email to every app on the Mac, including browsers without the extension.
 
 _Disclaimer: This extension is not endorsed by, directly affiliated with, maintained, authorized, or sponsored by Apple._
 
@@ -27,16 +48,16 @@ _Disclaimer: This extension is not endorsed by, directly affiliated with, mainta
 <img src="./src/assets/img/demo-content.gif" alt="Extension content demo" width="600" height="auto"/>
 </p>
 
-## Features
+### Features
 
 - Simple pop-up UI for generating and reserving new Hide My Email addresses
 - Ability to manage existing Hide My Email addresses (including deactivation, reactivation, and deletion)
 - Autofilling on any HTML input element that is relevant to email
 - Quick configuration of Hide My Email settings, such as the Forward-To address, through the Options page of the extension
 
-## Options
+### Options
 
-### Address autofilling
+#### Address autofilling
 
 The extension can be configured to
 
@@ -53,11 +74,11 @@ The extension can be configured to
 
 You can enable/disable any of the autofilling mechanisms through the Options page of the extension.
 
-## Develop
+### Develop
 
 This extension is entirely written in TypeScript. The UI pages of the extension (e.g. Pop-Up and Options) are implemented as React apps and styled with TailwindCSS.
 
-### Dev environment
+#### Dev environment
 
 Development was carried out in an environment that matches the following Docker image:
 
@@ -73,7 +94,7 @@ WORKDIR /opt/extension
 ENTRYPOINT ["sh"]
 ```
 
-### Development workflow
+#### Development workflow
 
 The table below outlines the sequence of steps that need to be followed in order to ship a change in the extension. The execution of some of these steps varies per browser engine.
 
@@ -92,7 +113,7 @@ Note: the following console commands are to be executed from the root directory 
 | 7 | Publish | [Chrome webstore dev console](https://chrome.google.com/webstore/devconsole/) | [Mozilla Add-on developer hub](https://addons.mozilla.org/en-US/developers/addon/icloud-hide-my-email/versions/submit/) |
 <!-- prettier-ignore-end -->
 
-### TODOs
+#### TODOs
 
 - [ ] Ability to modify the label and note of existing HME addresses
 - [ ] CI and maybe CD

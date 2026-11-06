@@ -19,6 +19,7 @@ struct HideMyEmailApp: App {
             ManagerView(model: .shared)
         }
         .defaultSize(width: 1080, height: 600)
+        .defaultLaunchBehavior(Demo.isEnabled ? .presented : .automatic)
 
         Settings {
             SettingsView(model: .shared, settings: .shared)
@@ -37,8 +38,13 @@ enum Updates {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         _ = Updates.controller
-        Task { await AppModel.shared.bootstrap() }
-        FieldWatcher.shared.start()
+        if Demo.isEnabled {
+            AppModel.shared.startDemo()
+            Demo.showPanels()
+        } else {
+            Task { await AppModel.shared.bootstrap() }
+            FieldWatcher.shared.start()
+        }
         HotKey.shared.register(Preferences.shared.shortcut) { Self.createFromShortcut() }
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification, object: nil, queue: .main

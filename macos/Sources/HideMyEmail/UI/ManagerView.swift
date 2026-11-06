@@ -12,7 +12,7 @@ enum AddressFilter: Hashable {
 struct ManagerView: View {
     let model: AppModel
     @State private var filter: AddressFilter? = .all
-    @State private var selection = Set<String>()
+    @State private var selection: Set<String> = Demo.isEnabled ? ["demo-1"] : []
     @State private var query = ""
     @State private var sortOrder = [KeyPathComparator(\HMEAddress.createTimestamp, order: .reverse)]
     @State private var showsInspector = true

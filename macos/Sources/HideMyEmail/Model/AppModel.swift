@@ -3,6 +3,7 @@ import HideMyEmailCore
 import Observation
 import SafariServices
 import ServiceManagement
+import SwiftUI
 
 enum SessionState: Equatable {
     case unknown
@@ -45,6 +46,8 @@ final class AppModel {
     private(set) var safariExtensionEnabled = true
 
     private var client: ICloudClient?
+    /// Sample addresses without an iCloud session, for screenshots (`--demo`).
+    private var isDemo = false
     private var keepAliveTask: Task<Void, Never>?
     private var sessionWatch: Task<Void, Never>?
 
@@ -61,6 +64,14 @@ final class AppModel {
     }
 
     // MARK: Session
+
+    func startDemo() {
+        isDemo = true
+        addresses = Demo.addresses
+        forwardToOptions = [Demo.forwardTo]
+        forwardTo = Demo.forwardTo
+        state = .signedIn
+    }
 
     func bootstrap() async {
         if let jar = Keychain.loadJar(region: region), !jar.isEmpty {
@@ -227,7 +238,7 @@ final class AppModel {
     // MARK: Addresses
 
     func refresh() async {
-        guard let client else { return }
+        guard !isDemo, let client else { return }
         isRefreshing = true
         defer { isRefreshing = false }
         do {
@@ -243,10 +254,17 @@ final class AppModel {
     }
 
     func generate() async throws -> String {
-        try await perform { try await $0.generate() }
+        if isDemo { return Demo.generate() }
+        return try await perform { try await $0.generate() }
     }
 
     func reserve(_ hme: String, label: String, note: String) async throws -> HMEAddress {
+        if isDemo {
+            let address = HMEAddress(anonymousId: UUID().uuidString, hme: hme, label: label, note: note,
+                                     forwardToEmail: forwardTo)
+            addresses.insert(address, at: 0)
+            return address
+        }
         let address = try await perform { try await $0.reserve(hme: hme, label: label, note: note) }
         addresses.insert(address, at: 0)
         Cache.save(addresses)
@@ -327,6 +345,85 @@ final class AppModel {
             await sessionExpired()
         }
         lastError = error.localizedDescription
+    }
+}
+
+// MARK: - Demo
+
+@MainActor
+enum Demo {
+    static let isEnabled = CommandLine.arguments.contains("--demo")
+    static let forwardTo = "alex.morgan@icloud.com"
+    private static var panels: [NSPanel] = []
+
+    /// The menu bar window and the email field suggestions in floating panels,
+    /// as if Zen were on github.com, so they can be captured while a
+    /// full-screen app hides the menu bar.
+    static func showPanels() {
+        AppModel.shared.context = BrowsingContext(appName: "Zen", pid: 0, site: "github.com")
+        let suggestions = SuggestionState()
+        suggestions.site = "github.com"
+        suggestions.generated = generate()
+        suggestions.existing = AppModel.shared.siteAddresses
+        show(MenuView(model: .shared)
+            .background(.windowBackground, in: .rect(cornerRadius: 18)), at: CGPoint(x: 80, y: 120))
+        show(SuggestionView(state: suggestions, onCreate: {}, onPick: { _ in })
+            .background(.windowBackground, in: .rect(cornerRadius: 15)), at: CGPoint(x: 460, y: 500))
+        Task {
+            try? await Task.sleep(for: .seconds(1))
+            guard let window = NSApp.windows.first(where: { $0.title == "Addresses" }) else { return }
+            window.collectionBehavior.formUnion([.canJoinAllSpaces, .fullScreenAuxiliary])
+            window.setFrame(CGRect(x: 160, y: 80, width: 1280, height: 700), display: true)
+            window.level = .floating
+            window.orderFrontRegardless()
+        }
+    }
+
+    private static func show(_ view: some View, at origin: CGPoint) {
+        let panel = NSPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
+                            backing: .buffered, defer: false)
+        panel.level = .floating
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        let host = NSHostingView(rootView: view)
+        panel.contentView = host
+        panel.setFrame(CGRect(origin: origin, size: host.fittingSize), display: true)
+        panel.orderFrontRegardless()
+        panels.append(panel)
+    }
+
+    static let addresses: [HMEAddress] = {
+        let entries: [(String, String, String, Bool)] = [
+            ("maple-orbit-7q", "github.com", "", true),
+            ("quiet-fern-2x", "figma.com", "Design team trial", true),
+            ("lunar-pebble-9k", "notion.so", "", true),
+            ("amber-delta-4m", "airbnb.com", "Lisbon trip", true),
+            ("cobalt-wren-6t", "spotify.com", "", true),
+            ("misty-canyon-3r", "linear.app", "", true),
+            ("velvet-atlas-8p", "booking.com", "", true),
+            ("sunny-harbor-5d", "duolingo.com", "", true),
+            ("brisk-meadow-1z", "medium.com", "Newsletter", false),
+            ("coral-summit-0v", "producthunt.com", "", true),
+            ("silent-ember-6w", "nytimes.com", "", false),
+            ("frost-lagoon-2c", "vercel.com", "", true),
+            ("tidal-prism-4h", "github.com", "Work account", true),
+            ("olive-comet-7s", "dropbox.com", "", true),
+        ]
+        let now = Date().timeIntervalSince1970 * 1000
+        return entries.enumerated().map { index, entry in
+            HMEAddress(anonymousId: "demo-\(index)", hme: "\(entry.0)@icloud.com", label: entry.1,
+                       note: entry.2, forwardToEmail: forwardTo, isActive: entry.3,
+                       createTimestamp: now - Double(index) * 4.3 * 86_400_000)
+        }
+    }()
+
+    private static let words = ["cedar", "glint", "harbor", "juniper", "lumen", "nimbus", "opal", "quartz",
+                                "saffron", "tundra", "willow", "zephyr"]
+
+    static func generate() -> String {
+        let suffix = String((0..<2).map { _ in "0123456789abcdefghjkmnpqrstvwxyz".randomElement()! })
+        return "\(words.randomElement()!)-\(words.randomElement()!)-\(suffix)@icloud.com"
     }
 }
 
