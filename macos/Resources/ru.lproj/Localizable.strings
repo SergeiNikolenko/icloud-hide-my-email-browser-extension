@@ -1,0 +1,88 @@
+/* Menu */
+"Hide My Email" = "Скрыть e-mail";
+"Search" = "Поиск";
+"No addresses" = "Нет адресов";
+"No results" = "Ничего не найдено";
+"Addresses" = "Адреса";
+"Settings" = "Настройки";
+"Quit" = "Завершить";
+"Forwards to %@" = "Пересылка на %@";
+"New Address" = "Новый адрес";
+"Reserved" = "Зарезервирован";
+"Copied" = "Скопировано";
+"Copy" = "Копировать";
+"Paste in %@" = "Вставить в %@";
+"Paste" = "Вставить";
+"Label" = "Метка";
+"Note" = "Заметка";
+"Required" = "Обязательно";
+"Optional" = "Необязательно";
+"Use This Address" = "Использовать адрес";
+"Inactive" = "Неактивен";
+"Copy Address" = "Скопировать адрес";
+"Allow…" = "Разрешить…";
+
+/* Suggestions */
+"New address for %@" = "Новый адрес для %@";
+"New address" = "Новый адрес";
+"Sign in to iCloud first" = "Сначала войдите в iCloud";
+"Copied %@" = "Скопировано: %@";
+
+/* Manager */
+"All Addresses" = "Все адреса";
+"sidebar.active" = "Активные";
+"sidebar.inactive" = "Неактивные";
+"Sites" = "Сайты";
+"Address" = "Адрес";
+"Created" = "Создан";
+"Status" = "Статус";
+"Copy Addresses" = "Скопировать адреса";
+"Deactivate" = "Деактивировать";
+"Reactivate" = "Активировать";
+"Delete…" = "Удалить…";
+"Delete" = "Удалить";
+"Mail sent to deleted addresses will no longer reach you." = "Письма на удалённые адреса больше не будут доходить до вас.";
+"Delete this address?" = "Удалить этот адрес?";
+"Delete %lld addresses?" = "Удалить адреса (%lld)?";
+"%lld Addresses" = "Адресов: %lld";
+"No Selection" = "Ничего не выбрано";
+"Refresh" = "Обновить";
+"Export as CSV…" = "Экспорт в CSV…";
+"Export as JSON…" = "Экспорт в JSON…";
+"Export" = "Экспорт";
+"Inspector" = "Инспектор";
+"Signed Out" = "Вход не выполнен";
+"No Addresses" = "Нет адресов";
+"Active" = "Активен";
+"Delete Address…" = "Удалить адрес…";
+"Create Address" = "Создать адрес";
+"Sign In to iCloud" = "Войти в iCloud";
+
+/* Settings */
+"General" = "Основные";
+"Account" = "Учётная запись";
+"Apps" = "Приложения";
+"Open at Login" = "Открывать при входе";
+"Create and Fill Shortcut" = "Создать и вставить";
+"Suggest Addresses in Email Fields" = "Предлагать адреса в полях e-mail";
+"Accessibility" = "Универсальный доступ";
+"Allowed" = "Разрешено";
+"iCloud China" = "iCloud (Китай)";
+"Forward To" = "Пересылать на";
+"Sign Out" = "Выйти из iCloud";
+"Sign In…" = "Войти…";
+"No Suggestions In" = "Без подсказок";
+"None" = "Нет";
+
+/* Errors */
+"Your iCloud session has expired. Sign in again." = "Сеанс iCloud истёк. Войдите снова.";
+"Hide My Email requires an iCloud+ subscription." = "Для функции «Скрыть e-mail» нужна подписка iCloud+.";
+"iCloud could not complete the request. Try again." = "iCloud не смог выполнить запрос. Попробуйте ещё раз.";
+"Can't reach iCloud. Check your connection and try again." = "Нет связи с iCloud. Проверьте подключение и попробуйте снова.";
+
+/* Sign-in */
+"Waiting for iCloud in %@…" = "Ждём вход в iCloud в %@…";
+"Cancel" = "Отменить";
+"Allow Full Disk Access…" = "Разрешить полный доступ к диску…";
+"Sign In with Another Browser" = "Войти через другой браузер";
+"Allow Accessibility to fill email fields" = "Разрешите универсальный доступ, чтобы заполнять поля e-mail";
