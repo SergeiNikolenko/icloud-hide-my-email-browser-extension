@@ -67,9 +67,7 @@ const options = {
   module: {
     rules: [
       {
-        // look for .css or .scss files
-        test: /\.(css|scss)$/,
-        // in the `src` directory
+        test: /\.css$/,
         use: [
           {
             loader: MiniCssExtractPlugin.loader,
@@ -79,12 +77,6 @@ const options = {
           },
           {
             loader: 'postcss-loader',
-          },
-          {
-            loader: 'sass-loader',
-            options: {
-              sourceMap: true,
-            },
           },
         ],
       },

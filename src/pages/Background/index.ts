@@ -27,6 +27,7 @@ import {
   SIGNED_OUT_CTA_COPY,
 } from './constants';
 import { isFirefox } from '../../browserUtils';
+import { errorToString } from '../../errors';
 
 const constructClient = async (): Promise<ICloudClient> => {
   const clientState = await getBrowserStorageValue('clientState');
@@ -83,81 +84,88 @@ const performAuthSideEffects = (
 
 // ===== Message handling =====
 
-browser.runtime.onMessage.addListener(async (uncastedMessage: unknown) => {
-  const message = uncastedMessage as Message<unknown>;
+browser.runtime.onMessage.addListener(
+  async (uncastedMessage: unknown, sender: browser.Runtime.MessageSender) => {
+    const message = uncastedMessage as Message<unknown>;
+    // Reply to the frame that asked, even if the user has switched tabs since.
+    const reply = (type: MessageType, data: unknown) =>
+      sender.tab
+        ? sendMessageToTab(type, data, sender.tab, sender.frameId)
+        : Promise.resolve();
 
-  switch (message.type) {
-    case MessageType.GenerateRequest:
-      {
-        const deauthCallback = async () => {
-          await sendMessageToTab(MessageType.GenerateResponse, {
-            error: SIGNED_OUT_CTA_COPY,
-            elementId,
-          });
-          performDeauthSideEffects();
-        };
+    switch (message.type) {
+      case MessageType.GenerateRequest:
+        {
+          const deauthCallback = async () => {
+            await reply(MessageType.GenerateResponse, {
+              error: SIGNED_OUT_CTA_COPY,
+              elementId,
+            });
+            performDeauthSideEffects();
+          };
 
-        const elementId = message.data;
+          const elementId = message.data;
 
-        const clientState = await getBrowserStorageValue('clientState');
-        if (clientState === undefined) {
-          await deauthCallback();
-          break;
+          const clientState = await getBrowserStorageValue('clientState');
+          if (clientState === undefined) {
+            await deauthCallback();
+            break;
+          }
+
+          const client = new ICloudClient(
+            clientState.setupUrl,
+            clientState.webservices
+          );
+          const isClientAuthenticated = await client.isAuthenticated();
+          if (!isClientAuthenticated) {
+            await deauthCallback();
+            break;
+          }
+
+          try {
+            const pms = new PremiumMailSettings(client);
+            const hme = await pms.generateHme();
+            await reply(MessageType.GenerateResponse, {
+              hme,
+              elementId,
+            });
+          } catch (e) {
+            await reply(MessageType.GenerateResponse, {
+              error: errorToString(e),
+              elementId,
+            });
+          }
         }
-
-        const client = new ICloudClient(
-          clientState.setupUrl,
-          clientState.webservices
-        );
-        const isClientAuthenticated = await client.isAuthenticated();
-        if (!isClientAuthenticated) {
-          await deauthCallback();
-          break;
+        break;
+      case MessageType.ReservationRequest:
+        {
+          const { hme, label, elementId } =
+            message.data as ReservationRequestData;
+          const client = await constructClient();
+          // Given that the reservation step happens shortly after
+          // the generation step, it is safe to assume that the client's
+          // auth state has been recently validated. Hence, we are
+          // skipping token validation.
+          try {
+            const pms = new PremiumMailSettings(client);
+            await pms.reserveHme(hme, label);
+            await reply(MessageType.ReservationResponse, {
+              hme,
+              elementId,
+            });
+          } catch (e) {
+            await reply(MessageType.ReservationResponse, {
+              error: errorToString(e),
+              elementId,
+            });
+          }
         }
-
-        try {
-          const pms = new PremiumMailSettings(client);
-          const hme = await pms.generateHme();
-          await sendMessageToTab(MessageType.GenerateResponse, {
-            hme,
-            elementId,
-          });
-        } catch (e) {
-          await sendMessageToTab(MessageType.GenerateResponse, {
-            error: e.toString(),
-            elementId,
-          });
-        }
-      }
-      break;
-    case MessageType.ReservationRequest:
-      {
-        const { hme, label, elementId } =
-          message.data as ReservationRequestData;
-        const client = await constructClient();
-        // Given that the reservation step happens shortly after
-        // the generation step, it is safe to assume that the client's
-        // auth state has been recently validated. Hence, we are
-        // skipping token validation.
-        try {
-          const pms = new PremiumMailSettings(client);
-          await pms.reserveHme(hme, label);
-          await sendMessageToTab(MessageType.ReservationResponse, {
-            hme,
-            elementId,
-          });
-        } catch (e) {
-          await sendMessageToTab(MessageType.ReservationResponse, {
-            error: e.toString(),
-            elementId,
-          });
-        }
-      }
-      break;
-    default:
-      break;
+        break;
+      default:
+        break;
+    }
   }
-});
+);
 
 // ===== Context menu =====
 
@@ -233,10 +241,13 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
 
+  const { frameId } = info;
+
   sendMessageToTab(
     MessageType.ActiveInputElementWrite,
     { text: LOADING_COPY } as ActiveInputElementWriteData,
-    tab
+    tab,
+    frameId
   );
 
   const serializedUrl = info.pageUrl || tab?.url;
@@ -252,7 +263,8 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
         text: SIGNED_OUT_CTA_COPY,
         copyToClipboard: false,
       } as ActiveInputElementWriteData,
-      tab
+      tab,
+      frameId
     );
     performDeauthSideEffects();
     return;
@@ -265,16 +277,18 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
     await sendMessageToTab(
       MessageType.ActiveInputElementWrite,
       { text: hme, copyToClipboard: true } as ActiveInputElementWriteData,
-      tab
+      tab,
+      frameId
     );
   } catch (e) {
     sendMessageToTab(
       MessageType.ActiveInputElementWrite,
       {
-        text: e.toString(),
+        text: errorToString(e),
         copyToClipboard: false,
       } as ActiveInputElementWriteData,
-      tab
+      tab,
+      frameId
     );
   }
 });
@@ -287,7 +301,7 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
 browser.webRequest.onResponseStarted.addListener(
   async (details: browser.WebRequest.OnResponseStartedDetailsType) => {
     const { statusCode, url } = details;
-    if (statusCode < 200 && statusCode > 299) {
+    if (statusCode < 200 || statusCode > 299) {
       console.debug('Request failed', details);
       return;
     }
@@ -296,7 +310,10 @@ browser.webRequest.onResponseStarted.addListener(
     const client = new ICloudClient(setupUrl);
     const isAuthenticated = await client.isAuthenticated();
     if (isAuthenticated) {
-      performAuthSideEffects(client, { notification: true });
+      // icloud.com calls accountLogin on every visit; only announce a new sign-in.
+      const wasSignedIn =
+        (await getBrowserStorageValue('clientState')) !== undefined;
+      performAuthSideEffects(client, { notification: !wasSignedIn });
     }
   },
   {
@@ -313,7 +330,7 @@ browser.webRequest.onResponseStarted.addListener(
 browser.webRequest.onResponseStarted.addListener(
   async (details: browser.WebRequest.OnResponseStartedDetailsType) => {
     const { statusCode } = details;
-    if (statusCode < 200 && statusCode > 299) {
+    if (statusCode < 200 || statusCode > 299) {
       console.debug('Request failed', details);
       return;
     }
@@ -337,7 +354,9 @@ browser.runtime.onInstalled.addListener(
       const client = await constructClient();
       const isAuthenticated = await client.isAuthenticated();
       if (isAuthenticated) {
-        performAuthSideEffects(client, { notification: true });
+        performAuthSideEffects(client, {
+          notification: details.reason === 'install',
+        });
       } else {
         performDeauthSideEffects();
       }

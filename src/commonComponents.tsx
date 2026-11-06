@@ -1,15 +1,14 @@
 import React, { ButtonHTMLAttributes, DetailedHTMLProps } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { LoaderCircle } from 'lucide-react';
 
-export const Spinner = () => {
+export const Spinner = (props: { className?: string }) => {
   return (
-    <div className="text-center">
-      <FontAwesomeIcon
-        icon={faSpinner}
-        spin={true}
-        className="text-3xl text-sky-400"
-      />
+    <div
+      className={`flex justify-center py-5 lg-secondary ${
+        props.className ?? ''
+      }`}
+    >
+      <LoaderCircle className="size-5 animate-spin" aria-label="Loading" />
     </div>
   );
 };
@@ -17,71 +16,39 @@ export const Spinner = () => {
 export const LoadingButton = (
   props: {
     loading: boolean;
+    variant?: 'primary' | 'secondary';
   } & DetailedHTMLProps<
     ButtonHTMLAttributes<HTMLButtonElement>,
     HTMLButtonElement
   >
 ) => {
-  const { loading, disabled, ...btnHtmlAttrs } = props;
-
-  const defaultClassName =
-    'w-full justify-center text-white bg-sky-400 hover:bg-sky-500 focus:ring-4 focus:outline-hidden focus:ring-blue-300 font-medium rounded-lg px-5 py-2.5 text-center mr-2 inline-flex items-center';
-
-  const diabledClassName =
-    'w-full justify-center text-white bg-gray-400 font-medium rounded-lg px-5 py-2.5 text-center mr-2 inline-flex items-center';
-
-  const btnClassName = disabled ? diabledClassName : defaultClassName;
+  const {
+    loading,
+    disabled,
+    variant = 'primary',
+    className,
+    children,
+    ...btnHtmlAttrs
+  } = props;
 
   return (
     <button
       type="submit"
-      className={btnClassName}
+      className={`lg-btn lg-btn-${variant} ${className ?? ''}`}
       disabled={loading || disabled}
+      aria-busy={loading}
       {...btnHtmlAttrs}
     >
-      {loading && !disabled && (
-        <FontAwesomeIcon icon={faSpinner} spin={true} className="mr-1" />
-      )}
-      {props.children}
+      {loading && <LoaderCircle className="animate-spin" />}
+      {children}
     </button>
   );
 };
 
 export const ErrorMessage = (props: { children?: React.ReactNode }) => {
   return (
-    <div
-      className="p-2 text-sm text-red-700 bg-red-100 rounded-lg"
-      role="alert"
-    >
+    <div className="lg-alert lg-enter" role="alert">
       {props.children}
-    </div>
-  );
-};
-
-export const TitledComponent = (props: {
-  title: string;
-  subtitle: string;
-  children?: React.ReactNode;
-}) => {
-  const children =
-    props.children instanceof Array ? props.children : [props.children];
-
-  return (
-    <div className="text-base space-y-3">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900">{props.title}</h1>
-        <h2 className="font-medium text-gray-400">{props.subtitle}</h2>
-      </div>
-      {children?.map((child, key) => {
-        return (
-          child && (
-            <React.Fragment key={key}>
-              <hr />
-              {child}
-            </React.Fragment>
-          )
-        );
-      })}
     </div>
   );
 };
@@ -97,7 +64,7 @@ export const Link = (
   const { className, children, ...restProps } = props;
   return (
     <a
-      className={`text-sky-400 hover:text-sky-500 ${className}`}
+      className={`lg-link ${className ?? ''}`}
       target="_blank"
       rel="noreferrer"
       {...restProps}

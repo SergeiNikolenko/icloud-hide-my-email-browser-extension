@@ -11,6 +11,12 @@
 
 Note that the extension _should_ work on any browser that implements the [extension API](https://developer.chrome.com/docs/extensions/reference/) supported by Chromium-based browsers.
 
+## About this fork
+
+This fork restyles the extension after native macOS materials, with light and dark themes, an address manager with search, editing and deletion confirmation, and a field button that no longer shifts page layouts. It also fixes autofill in iframes and repeated fields, replies to the tab that asked, keeps the session through network errors and drops the broad `tabs` permission.
+
+[`macos/`](macos/README.md) contains a native menu bar app that brings Hide My Email to every app on the Mac, including browsers without the extension.
+
 _Disclaimer: This extension is not endorsed by, directly affiliated with, maintained, authorized, or sponsored by Apple._
 
 <p align="center">

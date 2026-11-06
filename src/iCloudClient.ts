@@ -1,4 +1,11 @@
-export class UnsuccessfulRequestError extends Error {}
+export class UnsuccessfulRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+// Statuses with which setup.icloud.com rejects an expired or missing session.
+const SIGNED_OUT_STATUSES = [401, 403, 421];
 
 type ServiceName = 'premiummailsettings';
 
@@ -29,7 +36,8 @@ class ICloudClient {
 
     if (!response.ok) {
       throw new UnsuccessfulRequestError(
-        `Request to ${method} ${url} failed with status code ${response.status}`
+        `Request to ${method} ${url} failed with status code ${response.status}`,
+        response.status
       );
     }
 
@@ -43,12 +51,18 @@ class ICloudClient {
     return this.webservices[serviceName].url;
   }
 
+  // Only an explicit rejection of the session counts as signed out. Network
+  // failures and server errors keep the current session so that a flaky
+  // connection does not wipe the extension's state.
   public async isAuthenticated(): Promise<boolean> {
     try {
       await this.validateToken();
       return true;
-    } catch {
-      return false;
+    } catch (e) {
+      const isSessionRejected =
+        e instanceof UnsuccessfulRequestError &&
+        SIGNED_OUT_STATUSES.includes(e.status);
+      return !isSessionRejected && this.webservices !== undefined;
     }
   }
 

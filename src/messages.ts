@@ -36,7 +36,8 @@ export type ReservationResponseData = GenerationResponseData;
 export const sendMessageToTab = async (
   type: MessageType,
   data: unknown,
-  tab?: browser.Tabs.Tab
+  tab?: browser.Tabs.Tab,
+  frameId?: number
 ): Promise<void> => {
   if (tab === undefined) {
     [tab] = await browser.tabs.query({
@@ -46,9 +47,10 @@ export const sendMessageToTab = async (
   }
 
   if (tab?.id !== undefined) {
-    await browser.tabs.sendMessage(tab.id, {
-      type,
-      data,
-    });
+    await browser.tabs.sendMessage(
+      tab.id,
+      { type, data },
+      frameId !== undefined ? { frameId } : undefined
+    );
   }
 };
