@@ -89,8 +89,8 @@ final class AppModel {
     }
 
     func cancelSignIn() {
-        sessionWatch?.cancel()
         pendingBrowser = nil
+        watchQuietly()
     }
 
     /// Picks up a session in the background without prompting: Safari and
@@ -122,7 +122,11 @@ final class AppModel {
                 }
                 try? await Task.sleep(for: interval)
             }
-            self?.pendingBrowser = nil
+            // A timed-out sign-in falls back to the background watch, so a
+            // session that appears later (or after Full Disk Access) is still picked up.
+            guard let self, !Task.isCancelled, self.pendingBrowser != nil else { return }
+            self.pendingBrowser = nil
+            self.watchQuietly()
         }
     }
 

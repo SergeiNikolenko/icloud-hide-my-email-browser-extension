@@ -387,11 +387,6 @@ private struct SignedOutModule: View {
                         .buttonStyle(.glass)
                         .controlSize(.small)
                 }
-                if browser.engine == .safari, model.needsFullDiskAccess {
-                    Button("Allow Full Disk Access…", action: AX.openFullDiskAccessSettings)
-                        .buttonStyle(.glass)
-                        .controlSize(.small)
-                }
             } else {
                 HStack(spacing: 6) {
                     Button {
@@ -415,6 +410,11 @@ private struct SignedOutModule: View {
                     .fixedSize()
                     .help("Sign In with Another Browser")
                 }
+            }
+            if model.needsFullDiskAccess, model.pendingBrowser.map({ $0.engine == .safari }) ?? true {
+                Button("Allow Full Disk Access…", action: AX.openFullDiskAccessSettings)
+                    .buttonStyle(.glass)
+                    .controlSize(.small)
             }
         }
         .padding(.vertical, 8)
