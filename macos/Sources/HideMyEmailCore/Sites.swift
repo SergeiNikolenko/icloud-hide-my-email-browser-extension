@@ -31,17 +31,26 @@ public enum Sites {
         return registrableDomain(host)
     }
 
+    /// The registrable domain a label such as `login.figma.com` points at, or
+    /// nil when the label is not a host name.
+    public static func site(_ label: String) -> String? {
+        let host = label.trimmingCharacters(in: .whitespaces).lowercased()
+        guard host.contains("."), !host.contains(" ") else { return nil }
+        let parsed = URL(string: host.contains("://") ? host : "https://\(host)")?.host ?? host
+        return registrableDomain(parsed)
+    }
+
+    /// The site of an address, from its label or else the domain Safari recorded.
+    public static func site(of address: HMEAddress) -> String? {
+        site(address.label) ?? site(address.domain)
+    }
+
     /// Addresses that belong to a site, matched on the registrable domain of
     /// their label or of the domain Safari recorded.
     public static func addresses(_ addresses: [HMEAddress], for site: String) -> [HMEAddress] {
         let target = registrableDomain(site)
         return addresses.filter { address in
-            [address.domain, address.label].contains { candidate in
-                let host = candidate.trimmingCharacters(in: .whitespaces).lowercased()
-                guard host.contains("."), !host.contains(" ") else { return false }
-                let parsed = URL(string: host.contains("://") ? host : "https://\(host)")?.host ?? host
-                return registrableDomain(parsed) == target
-            }
+            [address.domain, address.label].contains { self.site($0) == target }
         }
     }
 }

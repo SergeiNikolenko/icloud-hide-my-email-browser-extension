@@ -4,8 +4,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-swift build -c release --arch arm64
-BIN_DIR=$(swift build -c release --arch arm64 --show-bin-path)
+swift build -c release --arch arm64 --arch x86_64
+BIN_DIR=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
 APP="build/Hide My Email.app"
 
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"

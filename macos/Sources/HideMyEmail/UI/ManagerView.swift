@@ -51,6 +51,7 @@ struct ManagerView: View {
                       contentType: exportFormat?.contentType ?? .commaSeparatedText,
                       defaultFilename: "Hide My Email") { _ in }
         .task { await model.refresh() }
+        .onChange(of: filter) { selection = [] }
         .overlay {
             if model.state == .signedOut {
                 ContentUnavailableView("Signed Out", systemImage: "envelope.badge.shield.half.filled")
@@ -61,11 +62,8 @@ struct ManagerView: View {
     // MARK: Sidebar
 
     private var topSites: [(String, Int)] {
-        let counts = Dictionary(grouping: model.addresses.compactMap { address -> String? in
-            let label = address.label.lowercased()
-            guard label.contains("."), !label.contains(" ") else { return nil }
-            return Sites.registrableDomain(URL(string: "https://\(label)")?.host ?? label)
-        }, by: { $0 }).mapValues(\.count)
+        let counts = Dictionary(grouping: model.addresses.compactMap { Sites.site($0.label) }, by: { $0 })
+            .mapValues(\.count)
         return counts.sorted { $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value }.prefix(15).map { ($0.key, $0.value) }
     }
 
@@ -85,8 +83,12 @@ struct ManagerView: View {
             if !topSites.isEmpty {
                 Section("Sites") {
                     ForEach(topSites, id: \.0) { site, count in
-                        Label(site, systemImage: "globe")
-                            .badge(count)
+                        Label {
+                            Text(site)
+                        } icon: {
+                            SiteTile(site: site, size: 18)
+                        }
+                        .badge(count)
                             .tag(AddressFilter.site(site))
                     }
                 }
@@ -118,8 +120,7 @@ struct ManagerView: View {
         Table(filteredAddresses, selection: $selection, sortOrder: $sortOrder) {
             TableColumn("Label", value: \.label) { address in
                 HStack(spacing: 8) {
-                    SiteBadge(label: address.label, isActive: address.isActive)
-                        .scaleEffect(0.85)
+                    SiteTile(address: address, size: 20)
                     Text(address.label).lineLimit(1)
                 }
             }
@@ -273,17 +274,18 @@ private struct AddressInspector: View {
     var body: some View {
         Form {
             Section {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(address.hme)
-                        .font(.system(size: 15, weight: .semibold))
-                        .textSelection(.enabled)
-                        .lineLimit(2)
-                    Text("Forwards to \(address.forwardToEmail)")
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 2)
-                HStack {
+                VStack(spacing: 10) {
+                    SiteTile(address: address, size: 56)
+                    VStack(spacing: 3) {
+                        Text(address.label)
+                            .font(.title3.weight(.semibold))
+                            .lineLimit(1)
+                        Text(address.hme)
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
                     Button {
                         Filler.copy(address.hme)
                         copied = true
@@ -291,7 +293,17 @@ private struct AddressInspector: View {
                         Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
                             .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+            }
+            Section {
+                LabeledContent("Forward To", value: address.forwardToEmail)
+                LabeledContent("Status") {
+                    Text(address.isActive ? "Active" : "Inactive")
+                        .foregroundStyle(address.isActive ? .green : .red)
                 }
             }
             Section {

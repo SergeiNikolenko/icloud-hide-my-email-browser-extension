@@ -46,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     static func createFromShortcut() {
         let model = AppModel.shared
         guard model.state == .signedIn else {
-            Toast.show(String(localized: "Sign in to iCloud first"), symbol: "exclamationmark.circle.fill")
+            Toast.show(String(localized: "Sign in to iCloud first"), symbol: "exclamationmark.circle.fill", tint: .orange)
             return
         }
         SuggestionPanel.shared.hide()
@@ -68,10 +68,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     Toast.show(address.hme)
                 } else {
                     Filler.copy(address.hme)
-                    Toast.show(String(localized: "Copied \(address.hme)"), symbol: "doc.on.doc.fill")
+                    Toast.show(String(localized: "Copied \(address.hme)"), symbol: "doc.on.doc.fill", tint: .accentColor)
                 }
             } catch {
-                Toast.show(error.localizedDescription, symbol: "exclamationmark.triangle.fill")
+                Toast.show(error.localizedDescription, symbol: "exclamationmark.triangle.fill", tint: .red)
             }
         }
     }

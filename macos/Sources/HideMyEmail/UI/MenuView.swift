@@ -9,31 +9,34 @@ struct MenuView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
 
+    // The menu bar window already sits on Liquid Glass, so its content uses
+    // plain sections and keeps glass for controls only.
     var body: some View {
-        GlassEffectContainer(spacing: 10) {
-            VStack(alignment: .leading, spacing: 10) {
-                header
-                switch model.state {
-                case .unknown:
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(maxWidth: .infinity, minHeight: 120)
-                case .signedOut:
-                    SignedOutModule(model: model)
-                case .signedIn:
-                    GeneratorModule(model: model) { text in
-                        dismiss()
-                        AppDelegate.paste(text, into: model.context)
-                    }
-                    addressesModule
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            switch model.state {
+            case .unknown:
+                ProgressView()
+                    .controlSize(.small)
+                    .frame(maxWidth: .infinity, minHeight: 120)
+            case .signedOut:
+                SignedOutModule(model: model)
+            case .signedIn:
+                GeneratorModule(model: model) { text in
+                    dismiss()
+                    AppDelegate.paste(text, into: model.context)
                 }
-                if !AX.isTrusted {
-                    AccessibilityModule()
-                }
-                footer
+                Divider()
+                addressesModule
             }
+            if !AX.isTrusted {
+                Divider()
+                AccessibilityModule()
+            }
+            Divider()
+            footer
         }
-        .padding(12)
+        .padding(14)
         .frame(width: 340)
         .task { if model.state == .signedIn { await model.refresh() } }
     }
@@ -41,30 +44,42 @@ struct MenuView: View {
     private var header: some View {
         HStack(spacing: 8) {
             Text("Hide My Email")
-                .font(.system(size: 15, weight: .semibold))
+                .font(.system(size: 13, weight: .bold))
             Spacer()
             if model.isRefreshing {
                 ProgressView().controlSize(.mini)
             }
         }
         .padding(.horizontal, 4)
-        .padding(.top, 2)
     }
 
-    private var visibleAddresses: [HMEAddress] {
+    private struct AddressSection: Identifiable {
+        let title: String?
+        let addresses: [HMEAddress]
+        var id: String { title ?? "" }
+    }
+
+    private var sections: [AddressSection] {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty {
-            let site = Set(model.siteAddresses.map(\.id))
-            return model.siteAddresses + model.addresses.filter { !site.contains($0.id) }
+        if !trimmed.isEmpty {
+            return [AddressSection(title: nil, addresses: model.addresses.filter {
+                $0.label.localizedCaseInsensitiveContains(trimmed) || $0.hme.localizedCaseInsensitiveContains(trimmed)
+                    || $0.note.localizedCaseInsensitiveContains(trimmed)
+            })]
         }
-        return model.addresses.filter {
-            $0.label.localizedCaseInsensitiveContains(trimmed) || $0.hme.localizedCaseInsensitiveContains(trimmed)
-                || $0.note.localizedCaseInsensitiveContains(trimmed)
+        guard let site = model.context?.site, !model.siteAddresses.isEmpty else {
+            return [AddressSection(title: nil, addresses: model.addresses)]
         }
+        let siteIDs = Set(model.siteAddresses.map(\.id))
+        return [
+            AddressSection(title: site, addresses: model.siteAddresses),
+            AddressSection(title: String(localized: "All Addresses"),
+                           addresses: model.addresses.filter { !siteIDs.contains($0.id) }),
+        ]
     }
 
     private var addressesModule: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("Search", text: $query)
@@ -73,31 +88,41 @@ struct MenuView: View {
             .font(.system(size: 13))
             .padding(.horizontal, 10)
             .frame(height: 28)
-            .background(.quaternary.opacity(0.6), in: .capsule)
+            .background(.fill.tertiary, in: .capsule)
 
-            let addresses = visibleAddresses
-            if addresses.isEmpty {
+            let sections = sections.filter { !$0.addresses.isEmpty }
+            if sections.isEmpty {
                 Text(query.isEmpty ? "No addresses" : "No results")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 44)
             } else {
+                let rows = sections.reduce(0) { $0 + $1.addresses.count }
+                let headers = sections.filter { $0.title != nil }.count
                 ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(addresses) { address in
-                            AddressRow(address: address, isForSite: model.siteAddresses.contains(address)) {
-                                dismiss()
-                                AppDelegate.paste(address.hme, into: model.context)
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(sections) { section in
+                            if let title = section.title {
+                                Text(title)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 6)
+                                    .frame(height: 24, alignment: .bottom)
+                                    .padding(.bottom, 2)
+                            }
+                            ForEach(section.addresses) { address in
+                                AddressRow(address: address) {
+                                    dismiss()
+                                    AppDelegate.paste(address.hme, into: model.context)
+                                }
                             }
                         }
                     }
                 }
                 .scrollBounceBehavior(.basedOnSize)
-                .frame(height: min(CGFloat(addresses.count) * 38, 266))
+                .frame(height: min(CGFloat(rows) * 40 + CGFloat(headers) * 26, 300))
             }
         }
-        .padding(8)
-        .glassEffect(.regular, in: .rect(cornerRadius: 18))
     }
 
     private var footer: some View {
@@ -105,16 +130,19 @@ struct MenuView: View {
             Button { open("manager") } label: {
                 Label("Addresses", systemImage: "list.bullet")
             }
+            .help("Addresses")
             Button {
                 NSApp.activate()
                 openSettings()
             } label: {
                 Label("Settings", systemImage: "gearshape")
             }
+            .help("Settings")
             Spacer()
             Button { NSApp.terminate(nil) } label: {
                 Label("Quit", systemImage: "power")
             }
+            .help("Quit")
         }
         .labelStyle(.iconOnly)
         .buttonStyle(.glass)
@@ -143,10 +171,11 @@ private struct GeneratorModule: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
+                SymbolBadge(systemName: "envelope.fill", size: 34)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(hme ?? " ")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
                         .textSelection(.enabled)
@@ -177,6 +206,7 @@ private struct GeneratorModule: View {
                     Label("Reserved", systemImage: "checkmark.circle.fill")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.green)
+                        .padding(.leading, 44)
                     Spacer()
                 }
                 HStack(spacing: 8) {
@@ -205,7 +235,7 @@ private struct GeneratorModule: View {
                     Divider().padding(.leading, 10)
                     FieldRow(title: "Note", prompt: "Optional", text: $note)
                 }
-                .background(.quaternary.opacity(0.45), in: .rect(cornerRadius: 10))
+                .background(.fill.tertiary, in: .rect(cornerRadius: 10))
 
                 Button {
                     Task { await reserve() }
@@ -224,8 +254,6 @@ private struct GeneratorModule: View {
                     .foregroundStyle(.red)
             }
         }
-        .padding(12)
-        .glassEffect(.regular, in: .rect(cornerRadius: 18))
         .task(id: model.context?.site) {
             label = model.context?.site ?? ""
             if hme == nil { await generate() }
@@ -288,14 +316,13 @@ private struct FieldRow: View {
 
 struct AddressRow: View {
     let address: HMEAddress
-    let isForSite: Bool
     let onPaste: () -> Void
     @State private var isHovered = false
     @State private var copied = false
 
     var body: some View {
         HStack(spacing: 10) {
-            SiteBadge(label: address.label, isActive: address.isActive)
+            SiteTile(address: address)
             VStack(alignment: .leading, spacing: 1) {
                 Text(address.label.isEmpty ? address.hme : address.label)
                     .font(.system(size: 13, weight: .medium))
@@ -330,8 +357,8 @@ struct AddressRow: View {
             }
         }
         .padding(.horizontal, 6)
-        .frame(height: 38)
-        .background(isHovered ? Color.primary.opacity(0.06) : .clear, in: .rect(cornerRadius: 10))
+        .frame(height: 40)
+        .background(isHovered ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 10))
         .contentShape(.rect)
         .onHover { hovering in
             isHovered = hovering
@@ -344,30 +371,12 @@ struct AddressRow: View {
     }
 }
 
-struct SiteBadge: View {
-    let label: String
-    let isActive: Bool
-
-    var body: some View {
-        Text(label.first.map { String($0).uppercased() } ?? "@")
-            .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .frame(width: 26, height: 26)
-            .background(.quaternary.opacity(0.7), in: .circle)
-            .opacity(isActive ? 1 : 0.5)
-    }
-}
-
 private struct SignedOutModule: View {
     let model: AppModel
 
     var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "envelope.badge.shield.half.filled")
-                .font(.system(size: 30))
-                .foregroundStyle(.secondary)
-                .frame(width: 60, height: 60)
-                .glassEffect(.regular, in: .circle)
+        VStack(spacing: 14) {
+            SymbolBadge(systemName: "envelope.badge.shield.half.filled", size: 56)
             if let browser = model.pendingBrowser {
                 HStack(spacing: 8) {
                     ProgressView().controlSize(.small)
@@ -408,9 +417,8 @@ private struct SignedOutModule: View {
                 }
             }
         }
-        .padding(16)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity)
-        .glassEffect(.regular, in: .rect(cornerRadius: 18))
     }
 }
 
@@ -418,7 +426,9 @@ private struct AccessibilityModule: View {
     var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "hand.raised")
+                .font(.system(size: 15))
                 .foregroundStyle(.secondary)
+                .frame(width: 28)
             Text("Allow Accessibility to fill email fields")
                 .font(.system(size: 12))
                 .fixedSize(horizontal: false, vertical: true)
@@ -430,7 +440,6 @@ private struct AccessibilityModule: View {
             .buttonStyle(.glass)
             .controlSize(.small)
         }
-        .padding(10)
-        .glassEffect(.regular, in: .rect(cornerRadius: 14))
+        .padding(.horizontal, 4)
     }
 }

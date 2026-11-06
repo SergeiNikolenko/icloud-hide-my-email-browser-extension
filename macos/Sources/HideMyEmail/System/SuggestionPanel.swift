@@ -107,7 +107,7 @@ struct SuggestionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             SuggestionRow(
-                symbol: "envelope.badge.shield.half.filled",
+                icon: SymbolBadge(systemName: "envelope.fill", size: 24),
                 title: state.generated ?? String(localized: "Hide My Email"),
                 subtitle: state.site.map { String(localized: "New address for \($0)") }
                     ?? String(localized: "New address"),
@@ -117,8 +117,8 @@ struct SuggestionView: View {
             .disabled(state.generated == nil || state.isWorking)
 
             ForEach(state.existing) { address in
-                SuggestionRow(symbol: "envelope", title: address.hme, subtitle: address.label,
-                              isBusy: false) { onPick(address) }
+                SuggestionRow(icon: SiteTile(address: address, size: 24), title: address.hme,
+                              subtitle: address.label, isBusy: false) { onPick(address) }
             }
 
             if let error = state.error {
@@ -136,8 +136,8 @@ struct SuggestionView: View {
     }
 }
 
-private struct SuggestionRow: View {
-    let symbol: String
+private struct SuggestionRow<Icon: View>: View {
+    let icon: Icon
     let title: String
     let subtitle: String
     let isBusy: Bool
@@ -147,10 +147,7 @@ private struct SuggestionRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 10) {
-                Image(systemName: symbol)
-                    .font(.system(size: 15))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 22)
+                icon
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(.system(size: 13, weight: .medium))
@@ -169,7 +166,7 @@ private struct SuggestionRow: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .contentShape(.rect(cornerRadius: 9))
-            .background(isHovered ? Color.primary.opacity(0.08) : .clear, in: .rect(cornerRadius: 9))
+            .background(isHovered ? AnyShapeStyle(.fill.tertiary) : AnyShapeStyle(.clear), in: .rect(cornerRadius: 9))
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
@@ -182,9 +179,9 @@ enum Toast {
     private static var panel: NSPanel?
     private static var dismissal: Task<Void, Never>?
 
-    static func show(_ message: String, symbol: String = "checkmark.circle.fill") {
+    static func show(_ message: String, symbol: String = "checkmark.circle.fill", tint: Color = .green) {
         let content = HStack(spacing: 8) {
-            Image(systemName: symbol).foregroundStyle(.secondary)
+            Image(systemName: symbol).foregroundStyle(tint)
             Text(message).font(.system(size: 13, weight: .medium)).lineLimit(1)
         }
         .padding(.horizontal, 16)

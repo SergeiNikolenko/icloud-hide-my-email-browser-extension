@@ -31,6 +31,24 @@ import Testing
     }
 }
 
+@Suite struct SiteIconTests {
+    @Test func prefersTouchIconsThenLargestIcon() {
+        let html = """
+        <head><link rel="icon" href="/small.png" sizes="16x16">
+        <LINK REL='shortcut icon' href='https://cdn.example.com/big.png' sizes='64x64'/>
+        <link rel="mask-icon" href="/mask.svg"><link rel="stylesheet" href="/a.css">
+        <link href="touch.png" rel="apple-touch-icon"></head>
+        """
+        let urls = SiteIcon.candidates(in: html, base: URL(string: "https://www.example.com/en/")!)
+        #expect(urls.map(\.absoluteString) == [
+            "https://www.example.com/en/touch.png",
+            "https://cdn.example.com/big.png",
+            "https://www.example.com/small.png",
+            "https://www.example.com/favicon.ico",
+        ])
+    }
+}
+
 @Suite struct EmailFieldTests {
     @Test func chromiumEmailInput() {
         #expect(EmailField.isEmailField(FieldDescriptor(role: "AXTextField", roleDescription: "email")))
