@@ -1,5 +1,6 @@
 import AppKit
 import HideMyEmailCore
+import SafariServices
 import SwiftUI
 
 struct MenuView: View {
@@ -411,10 +412,12 @@ private struct SignedOutModule: View {
                     .help("Sign In with Another Browser")
                 }
             }
-            if model.needsFullDiskAccess, model.pendingBrowser.map({ $0.engine == .safari }) ?? true {
-                Button("Allow Full Disk Access…", action: AX.openFullDiskAccessSettings)
-                    .buttonStyle(.glass)
-                    .controlSize(.small)
+            if !model.safariExtensionEnabled, model.pendingBrowser.map({ $0.engine == .safari }) ?? true {
+                Button("Turn On Safari Extension…") {
+                    Task { try? await SFSafariApplication.showPreferencesForExtension(withIdentifier: BrowserCookies.safariExtensionID) }
+                }
+                .buttonStyle(.glass)
+                .controlSize(.small)
             }
         }
         .padding(.vertical, 8)

@@ -24,7 +24,9 @@ fields). Safari is left alone because it has Hide My Email built in.
   soon as you are signed in, so passkeys and two-factor authentication work as
   usual. Sessions already open in Safari, Zen or Firefox are found
   automatically. Arc, Chrome, Brave, Edge and Vivaldi work too after one
-  Keychain prompt, and Safari needs Full Disk Access. The app keeps its own copy
+  Keychain prompt. Safari hands its session over through the bundled Hide My
+  Email Safari extension, which may only access icloud.com, so the app never
+  reads Safari's data. The app keeps its own copy
   in the Keychain, refreshes it every 20 minutes and takes the session from the
   browser again when it expires. iCloud China accounts are supported.
 
@@ -37,8 +39,9 @@ silicon and Intel, and updates itself through Sparkle.
 
 The app is not notarized yet, so macOS blocks the first launch. Open it once,
 then choose **Open Anyway** in System Settings → Privacy & Security. After that,
-allow Accessibility when the app asks, and Full Disk Access if you sign in
-through Safari.
+allow Accessibility when the app asks. To sign in through Safari, turn on the
+Hide My Email extension in Safari Settings → Extensions and allow it on
+icloud.com.
 
 ## Build
 

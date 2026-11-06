@@ -83,7 +83,7 @@
 /* Sign-in */
 "Waiting for iCloud in %@…" = "Ждём вход в iCloud в %@…";
 "Cancel" = "Отменить";
-"Allow Full Disk Access…" = "Разрешить полный доступ к диску…";
+"Turn On Safari Extension…" = "Включить расширение в Safari…";
 "Sign In with Another Browser" = "Войти через другой браузер";
 "Allow Accessibility to fill email fields" = "Разрешите универсальный доступ, чтобы заполнять поля e-mail";
 "Version %@" = "Версия %@";

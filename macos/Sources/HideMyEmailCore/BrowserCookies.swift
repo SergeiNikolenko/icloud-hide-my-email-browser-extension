@@ -21,8 +21,12 @@ public enum BrowserCookies {
         public let dataPath: String
     }
 
+    /// Safari's session comes from the bundled Safari extension, so the app never
+    /// reads Safari's own cookie store.
     public static let safari = Browser(id: "safari", name: "Safari", bundleID: "com.apple.Safari", engine: .safari,
-                                       dataPath: "../Containers/com.apple.Safari/Data/Library/Cookies")
+                                       dataPath: "")
+    public static let safariExtensionID = "com.nikolenko.HideMyEmail.Safari"
+    static let appGroup = "XNPNVQSG77.com.nikolenko.HideMyEmail"
 
     public static let browsers: [Browser] = [
         safari,
@@ -51,7 +55,10 @@ public enum BrowserCookies {
     }
 
     public static func installed() -> [Browser] {
-        browsers.filter { FileManager.default.fileExists(atPath: supportDirectory.appendingPathComponent($0.dataPath).path) }
+        browsers.filter { browser in
+            browser.engine == .safari
+                || FileManager.default.fileExists(atPath: supportDirectory.appendingPathComponent(browser.dataPath).path)
+        }
     }
 
     /// The browser's cookies for a domain, across all of its profiles.
@@ -59,9 +66,16 @@ public enum BrowserCookies {
         let root = supportDirectory.appendingPathComponent(browser.dataPath)
         switch browser.engine {
         case .safari:
-            // Safari's container is protected; reading it needs Full Disk Access.
-            let data = try Data(contentsOf: root.appendingPathComponent("Cookies.binarycookies"))
-            return parseBinaryCookies(data).filter { $0.domain.hasSuffix(domain) }
+            guard let directory = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup),
+                  let data = try? Data(contentsOf: directory.appendingPathComponent("SafariSession.json"))
+            else { return [] }
+            return try JSONDecoder().decode(SafariSession.self, from: data).cookies
+                .filter { $0.domain.hasSuffix(domain) }
+                .map { cookie in
+                    StoredCookie(name: cookie.name, value: cookie.value, domain: cookie.domain, path: cookie.path,
+                                 expires: cookie.expirationDate.map(Date.init(timeIntervalSince1970:)),
+                                 isSecure: cookie.secure)
+                }
         case .gecko:
             return profiles(in: root, containing: "cookies.sqlite").flatMap { profile in
                 geckoDatabaseCookies(profile: profile, domain: domain) + geckoSessionCookies(profile: profile, domain: domain)
@@ -131,43 +145,18 @@ public enum BrowserCookies {
 
     // MARK: Safari
 
-    /// Parses Safari's `Cookies.binarycookies`: big-endian page table, then
-    /// little-endian cookie records with string offsets.
-    static func parseBinaryCookies(_ data: Data) -> [StoredCookie] {
-        let bytes = [UInt8](data)
-        func be32(_ at: Int) -> Int { at + 4 <= bytes.count ? bytes[at..<at + 4].reduce(0) { $0 << 8 | Int($1) } : 0 }
-        func le32(_ at: Int) -> Int { at + 4 <= bytes.count ? bytes[at..<at + 4].reversed().reduce(0) { $0 << 8 | Int($1) } : 0 }
-        func le64Double(_ at: Int) -> Double {
-            guard at + 8 <= bytes.count else { return 0 }
-            let bits = bytes[at..<at + 8].reversed().reduce(UInt64(0)) { $0 << 8 | UInt64($1) }
-            return Double(bitPattern: bits)
-        }
-        func string(_ at: Int) -> String {
-            guard at < bytes.count, let end = bytes[at...].firstIndex(of: 0) else { return "" }
-            return String(decoding: bytes[at..<end], as: UTF8.self)
+    /// What SafariExtension/Resources/background.js sends: `browser.cookies` records.
+    private struct SafariSession: Decodable {
+        struct Cookie: Decodable {
+            let name: String
+            let value: String
+            let domain: String
+            let path: String
+            let expirationDate: Double?
+            let secure: Bool
         }
 
-        guard bytes.count > 8, Array(bytes.prefix(4)) == Array("cook".utf8) else { return [] }
-        let pageCount = be32(4)
-        var pageStart = 8 + pageCount * 4
-        var cookies: [StoredCookie] = []
-        for page in 0..<pageCount {
-            let pageSize = be32(8 + page * 4)
-            let cookieCount = le32(pageStart + 4)
-            for index in 0..<cookieCount {
-                let start = pageStart + le32(pageStart + 8 + index * 4)
-                let flags = le32(start + 8)
-                let expiry = le64Double(start + 40)
-                cookies.append(StoredCookie(
-                    name: string(start + le32(start + 20)), value: string(start + le32(start + 28)),
-                    domain: string(start + le32(start + 16)), path: string(start + le32(start + 24)),
-                    expires: expiry > 0 ? Date(timeIntervalSinceReferenceDate: expiry) : nil,
-                    isSecure: flags & 1 != 0
-                ))
-            }
-            pageStart += pageSize
-        }
-        return cookies
+        let cookies: [Cookie]
     }
 
     // MARK: Chromium

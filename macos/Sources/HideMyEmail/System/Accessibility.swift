@@ -14,10 +14,6 @@ enum AX {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }
 
-    static func openFullDiskAccessSettings() {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
-    }
-
     static func attribute<T>(_ element: AXUIElement, _ name: String, as type: T.Type = T.self) -> T? {
         var value: AnyObject?
         guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }

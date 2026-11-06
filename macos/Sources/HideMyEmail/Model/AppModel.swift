@@ -1,6 +1,7 @@
 import AppKit
 import HideMyEmailCore
 import Observation
+import SafariServices
 import ServiceManagement
 
 enum SessionState: Equatable {
@@ -40,8 +41,8 @@ final class AppModel {
     }
     /// The browser the user is signing in with, while the app waits for the session.
     private(set) var pendingBrowser: BrowserCookies.Browser?
-    /// Safari's cookies are readable only with Full Disk Access.
-    private(set) var needsFullDiskAccess = false
+    /// Safari hands over its session only through the bundled extension.
+    private(set) var safariExtensionEnabled = true
 
     private var client: ICloudClient?
     private var keepAliveTask: Task<Void, Never>?
@@ -111,6 +112,10 @@ final class AppModel {
         sessionWatch = Task { [weak self] in
             while !Task.isCancelled, deadline.map({ ContinuousClock.now < $0 }) ?? true {
                 guard let self, self.state != .signedIn else { break }
+                if browsers.contains(where: { $0.engine == .safari }) {
+                    self.safariExtensionEnabled = (try? await SFSafariExtensionManager
+                        .stateOfSafariExtension(withIdentifier: BrowserCookies.safariExtensionID).isEnabled) ?? false
+                }
                 for browser in browsers {
                     if let jar = await self.sessionJar(from: browser) {
                         self.sessionBrowser = browser
@@ -123,7 +128,7 @@ final class AppModel {
                 try? await Task.sleep(for: interval)
             }
             // A timed-out sign-in falls back to the background watch, so a
-            // session that appears later (or after Full Disk Access) is still picked up.
+            // session that appears later (or after the Safari extension is on) is still picked up.
             guard let self, !Task.isCancelled, self.pendingBrowser != nil else { return }
             self.pendingBrowser = nil
             self.watchQuietly()
@@ -136,9 +141,7 @@ final class AppModel {
         let cookies: [StoredCookie]
         do {
             cookies = try await Task.detached { try BrowserCookies.cookies(from: browser, domain: domain) }.value
-            if browser.engine == .safari { needsFullDiskAccess = false }
         } catch {
-            if browser.engine == .safari { needsFullDiskAccess = true }
             return nil
         }
         var jar = CookieJar()
