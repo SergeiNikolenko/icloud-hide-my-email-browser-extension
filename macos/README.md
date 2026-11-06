@@ -33,7 +33,7 @@ fields). Safari is left alone because it has Hide My Email built in.
 Download `HideMyEmail.dmg` from the
 [latest release](https://github.com/SergeiNikolenko/icloud-hide-my-email-browser-extension/releases/latest)
 and drag the app to Applications. It runs on macOS 26 or later, on Apple
-silicon and Intel.
+silicon and Intel, and updates itself through Sparkle.
 
 The app is not notarized yet, so macOS blocks the first launch. Open it once,
 then choose **Open Anyway** in System Settings → Privacy & Security. After that,
@@ -47,6 +47,7 @@ Requires macOS 26 or later and Xcode 26 or later.
 ```sh
 ./scripts/build-app.sh          # builds and signs build/Hide My Email.app
 ./scripts/make-dmg.sh           # packages it into build/HideMyEmail.dmg
+./scripts/release.sh            # publishes the version in Resources/Info.plist
 swift test                      # core tests
 ```
 

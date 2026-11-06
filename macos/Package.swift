@@ -8,11 +8,14 @@ let package = Package(
     products: [
         .executable(name: "HideMyEmail", targets: ["HideMyEmail"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0"),
+    ],
     targets: [
         .target(name: "HideMyEmailCore"),
         .executableTarget(
             name: "HideMyEmail",
-            dependencies: ["HideMyEmailCore"]
+            dependencies: ["HideMyEmailCore", .product(name: "Sparkle", package: "Sparkle")]
         ),
         .testTarget(
             name: "HideMyEmailCoreTests",

@@ -41,6 +41,9 @@ private struct GeneralSettings: View {
                 Toggle("Suggest Addresses in Email Fields", isOn: $settings.showsSuggestions)
             }
             Section {
+                LabeledContent("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")") {
+                    Button("Check for Updates…") { Updates.controller.checkForUpdates(nil) }
+                }
                 LabeledContent("Accessibility") {
                     if isTrusted {
                         Text("Allowed").foregroundStyle(.green)

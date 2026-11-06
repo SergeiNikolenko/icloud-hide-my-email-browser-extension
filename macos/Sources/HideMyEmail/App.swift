@@ -1,5 +1,6 @@
 import AppKit
 import HideMyEmailCore
+import Sparkle
 import SwiftUI
 
 @main
@@ -25,9 +26,17 @@ struct HideMyEmailApp: App {
     }
 }
 
+/// Sparkle checks the feed daily and installs updates in the background.
+@MainActor
+enum Updates {
+    static let controller = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil,
+                                                         userDriverDelegate: nil)
+}
+
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        _ = Updates.controller
         Task { await AppModel.shared.bootstrap() }
         FieldWatcher.shared.start()
         HotKey.shared.register(Preferences.shared.shortcut) { Self.createFromShortcut() }
