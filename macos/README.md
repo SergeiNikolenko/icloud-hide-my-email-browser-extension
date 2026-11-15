@@ -47,6 +47,10 @@ allow Accessibility when the app asks. To sign in through Safari, turn on the
 Hide My Email extension in Safari Settings → Extensions and allow it on
 icloud.com.
 
+If the app reports that the Safari extension is off or unavailable, open its
+extension settings first. After allowing access to icloud.com, the extension
+shares the session again; its toolbar button also retries the handoff.
+
 ## Build
 
 Requires macOS 26 or later and Xcode 26 or later.
@@ -56,7 +60,13 @@ Requires macOS 26 or later and Xcode 26 or later.
 ./scripts/make-dmg.sh           # packages it into build/HideMyEmail.dmg
 ./scripts/release.sh            # publishes the version in Resources/Info.plist
 swift test                      # core tests
+node --test Tests/SafariBridgeTests.mjs # Safari bridge tests
 ```
+
+From the repository root, `./script/build_and_run.sh --install --verify`
+builds, installs in Applications, and relaunches the app without changing its
+saved data. The previous app bundle goes to Trash. The installer registers only
+the installed Safari extension and verifies the signature after copying.
 
 Launching the app with `--demo` shows sample addresses without signing in
 and opens the Addresses window, the menu and the field suggestions in

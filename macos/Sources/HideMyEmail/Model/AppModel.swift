@@ -1,6 +1,7 @@
 import AppKit
 import HideMyEmailCore
 import Observation
+import OSLog
 import SafariServices
 import ServiceManagement
 import SwiftUI
@@ -9,6 +10,10 @@ enum SessionState: Equatable {
     case unknown
     case signedOut
     case signedIn
+}
+
+enum SafariExtensionState {
+    case checking, enabled, disabled, unavailable
 }
 
 /// The app the user was working in before opening the menu, and the site open in it.
@@ -43,7 +48,8 @@ final class AppModel {
     /// The browser the user is signing in with, while the app waits for the session.
     private(set) var pendingBrowser: BrowserCookies.Browser?
     /// Safari hands over its session only through the bundled extension.
-    private(set) var safariExtensionEnabled = true
+    private(set) var safariExtensionState: SafariExtensionState = .checking
+    private let logger = Logger(subsystem: "com.nikolenko.HideMyEmail", category: "Session")
 
     private var client: ICloudClient?
     /// Sample addresses without an iCloud session, for screenshots (`--demo`).
@@ -124,8 +130,17 @@ final class AppModel {
             while !Task.isCancelled, deadline.map({ ContinuousClock.now < $0 }) ?? true {
                 guard let self, self.state != .signedIn else { break }
                 if browsers.contains(where: { $0.engine == .safari }) {
-                    self.safariExtensionEnabled = (try? await SFSafariExtensionManager
-                        .stateOfSafariExtension(withIdentifier: BrowserCookies.safariExtensionID).isEnabled) ?? false
+                    do {
+                        let enabled = try await SFSafariExtensionManager
+                            .stateOfSafariExtension(withIdentifier: BrowserCookies.safariExtensionID).isEnabled
+                        self.safariExtensionState = enabled ? .enabled : .disabled
+                    } catch {
+                        if self.safariExtensionState != .unavailable {
+                            let error = error as NSError
+                            self.logger.error("Safari extension state failed: \(error.domain, privacy: .public) \(error.code)")
+                        }
+                        self.safariExtensionState = .unavailable
+                    }
                 }
                 for browser in browsers {
                     if let jar = await self.sessionJar(from: browser) {

@@ -84,6 +84,10 @@
 "Waiting for iCloud in %@…" = "Ждём вход в iCloud в %@…";
 "Cancel" = "Отменить";
 "Turn On Safari Extension…" = "Включить расширение в Safari…";
+"Safari Extension Settings…" = "Настройки расширения Safari…";
+"Checking Safari…" = "Проверка Safari…";
+"Safari extension is off" = "Расширение Safari выключено";
+"Safari extension is unavailable" = "Расширение Safari недоступно";
 "Sign In with Another Browser" = "Войти через другой браузер";
 "Allow Accessibility to fill email fields" = "Разрешите универсальный доступ, чтобы заполнять поля e-mail";
 "Version %@" = "Версия %@";

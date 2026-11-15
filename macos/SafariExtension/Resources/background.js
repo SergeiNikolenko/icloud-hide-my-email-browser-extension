@@ -6,7 +6,7 @@ let pending;
 async function share() {
   const cookies = (await Promise.all(DOMAINS.map((domain) => browser.cookies.getAll({ domain })))).flat();
   if (!cookies.some((cookie) => cookie.name.startsWith("X-APPLE-WEBAUTH"))) return;
-  await browser.runtime.sendNativeMessage("com.nikolenko.HideMyEmail", {
+  const reply = await browser.runtime.sendNativeMessage("com.nikolenko.HideMyEmail", {
     cookies: cookies.map(({ name, value, domain, path, expirationDate, secure }) => ({
       name,
       value,
@@ -16,12 +16,15 @@ async function share() {
       secure,
     })),
   });
+  if (reply?.ok !== true) throw new Error("Session was not saved");
 }
 
 // iCloud rotates several cookies at once; send the settled set.
 function scheduleShare() {
   clearTimeout(pending);
-  pending = setTimeout(share, 1000);
+  pending = setTimeout(() => {
+    share().catch(() => console.warn("Hide My Email could not share the iCloud session."));
+  }, 1000);
 }
 
 browser.cookies.onChanged.addListener(({ cookie }) => {
@@ -29,4 +32,6 @@ browser.cookies.onChanged.addListener(({ cookie }) => {
 });
 browser.runtime.onInstalled.addListener(scheduleShare);
 browser.runtime.onStartup.addListener(scheduleShare);
+browser.permissions.onAdded.addListener(scheduleShare);
+browser.action.onClicked.addListener(scheduleShare);
 scheduleShare();

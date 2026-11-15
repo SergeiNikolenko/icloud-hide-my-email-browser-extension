@@ -6,14 +6,24 @@ import SafariServices
 @objc(SafariWebExtensionHandler)
 final class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
     func beginRequest(with context: NSExtensionContext) {
-        let item = context.inputItems.first as? NSExtensionItem
-        if let message = item?.userInfo?[SFExtensionMessageKey],
-           JSONSerialization.isValidJSONObject(message),
-           let data = try? JSONSerialization.data(withJSONObject: message),
-           let directory = FileManager.default
-               .containerURL(forSecurityApplicationGroupIdentifier: "XNPNVQSG77.com.nikolenko.HideMyEmail") {
-            try? data.write(to: directory.appendingPathComponent("SafariSession.json"), options: .atomic)
+        let reply = NSExtensionItem()
+        var saved = false
+        defer {
+            reply.userInfo = [SFExtensionMessageKey: ["ok": saved]]
+            context.completeRequest(returningItems: [reply])
         }
-        context.completeRequest(returningItems: nil)
+        let item = context.inputItems.first as? NSExtensionItem
+        guard let message = item?.userInfo?[SFExtensionMessageKey],
+              JSONSerialization.isValidJSONObject(message),
+              let directory = FileManager.default
+                  .containerURL(forSecurityApplicationGroupIdentifier: "XNPNVQSG77.com.nikolenko.HideMyEmail")
+        else { return }
+        do {
+            let data = try JSONSerialization.data(withJSONObject: message)
+            try data.write(to: directory.appendingPathComponent("SafariSession.json"), options: .atomic)
+            saved = true
+        } catch {
+            saved = false
+        }
     }
 }

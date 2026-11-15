@@ -9,7 +9,9 @@ swift build -c release --arch arm64 --arch x86_64
 BIN_DIR=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
 # Assemble and sign outside the project: synced folders such as ~/Documents add
 # Finder attributes that codesign rejects.
-APP="$(mktemp -d)/Hide My Email.app"
+STAGING=$(mktemp -d)
+trap 'timeout 30 /usr/bin/trash "$STAGING"' EXIT
+APP="$STAGING/Hide My Email.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp -f "$BIN_DIR/HideMyEmail" "$APP/Contents/MacOS/HideMyEmail"
 install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/HideMyEmail"
@@ -18,7 +20,8 @@ cp -f Resources/Info.plist "$APP/Contents/Info.plist"
 cp -R Resources/en.lproj Resources/ru.lproj "$APP/Contents/Resources/"
 
 if [ ! -f Resources/AppIcon.icns ]; then
-  WORK=$(mktemp -d)
+  WORK="$STAGING/icon"
+  mkdir -p "$WORK"
   swift scripts/make-icon.swift "$WORK"
   iconutil -c icns "$WORK/AppIcon.iconset" -o Resources/AppIcon.icns
 fi
@@ -27,7 +30,8 @@ cp -f Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 # The Safari web extension that hands Safari's icloud.com session to the app.
 APPEX="$APP/Contents/PlugIns/HideMyEmailSafari.appex"
 mkdir -p "$APPEX/Contents/MacOS" "$APPEX/Contents/Resources"
-EXT_BUILD=$(mktemp -d)
+EXT_BUILD="$STAGING/extension"
+mkdir -p "$EXT_BUILD"
 for ARCH in arm64 x86_64; do
   xcrun swiftc -O -parse-as-library -application-extension -target "$ARCH-apple-macos26.0" \
     -Xlinker -e -Xlinker _NSExtensionMain SafariExtension/SafariWebExtensionHandler.swift \
@@ -55,7 +59,12 @@ find "$FRAMEWORK/Versions/B" -depth \( -name '*.xpc' -o -name '*.app' \) -print0
 "${SIGN[@]}" --entitlements SafariExtension/Extension.entitlements "$APPEX"
 "${SIGN[@]}" --entitlements Resources/HideMyEmail.entitlements "$APP"
 codesign --verify --deep --strict "$APP"
-rm -rf "build/Hide My Email.app"
+if [ -d "build/Hide My Email.app" ]; then
+  timeout 30 /usr/bin/trash "build/Hide My Email.app"
+fi
 mkdir -p build
-ditto "$APP" "build/Hide My Email.app"
+ditto --norsrc --noextattr --noqtn "$APP" "build/Hide My Email.app"
+# File-provider folders may add Finder metadata after the staging signature.
+xattr -dr com.apple.FinderInfo "build/Hide My Email.app"
+codesign --verify --deep --strict "build/Hide My Email.app"
 echo "Built build/Hide My Email.app"

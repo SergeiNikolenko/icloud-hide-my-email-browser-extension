@@ -380,14 +380,28 @@ private struct SignedOutModule: View {
             SymbolBadge(systemName: "envelope.badge.shield.half.filled", size: 56)
             if let browser = model.pendingBrowser {
                 HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text("Waiting for iCloud in \(browser.name)…")
-                        .font(.system(size: 13))
+                    if browser.engine == .safari, model.safariExtensionState != .enabled {
+                        switch model.safariExtensionState {
+                        case .checking:
+                            ProgressView().controlSize(.small)
+                            Text("Checking Safari…")
+                        case .disabled:
+                            Text("Safari extension is off")
+                        case .unavailable:
+                            Text("Safari extension is unavailable")
+                        case .enabled:
+                            EmptyView()
+                        }
+                    } else {
+                        ProgressView().controlSize(.small)
+                        Text("Waiting for iCloud in \(browser.name)…")
+                    }
                     Spacer(minLength: 0)
                     Button("Cancel", action: model.cancelSignIn)
                         .buttonStyle(.glass)
                         .controlSize(.small)
                 }
+                .font(.system(size: 13))
             } else {
                 HStack(spacing: 6) {
                     Button {
@@ -412,8 +426,10 @@ private struct SignedOutModule: View {
                     .help("Sign In with Another Browser")
                 }
             }
-            if !model.safariExtensionEnabled, model.pendingBrowser.map({ $0.engine == .safari }) ?? true {
-                Button("Turn On Safari Extension…") {
+            if model.safariExtensionState == .disabled || model.safariExtensionState == .unavailable,
+               model.pendingBrowser.map({ $0.engine == .safari }) ?? true {
+                Button(model.safariExtensionState == .disabled
+                       ? "Turn On Safari Extension…" : "Safari Extension Settings…") {
                     Task { try? await SFSafariApplication.showPreferencesForExtension(withIdentifier: BrowserCookies.safariExtensionID) }
                 }
                 .buttonStyle(.glass)
