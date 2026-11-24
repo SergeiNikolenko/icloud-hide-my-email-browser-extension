@@ -14,6 +14,10 @@ enum AX {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }
 
+    static func setTimeout(_ element: AXUIElement, seconds: Float = 0.25) {
+        AXUIElementSetMessagingTimeout(element, seconds)
+    }
+
     static func attribute<T>(_ element: AXUIElement, _ name: String, as type: T.Type = T.self) -> T? {
         var value: AnyObject?
         guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success else { return nil }
@@ -31,11 +35,17 @@ enum AX {
     /// assistive client asks for it.
     static func enableWebAccessibility(pid: pid_t) {
         let app = AXUIElementCreateApplication(pid)
+        setTimeout(app)
         AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+        AXUIElementSetAttributeValue(app, "AXEnhancedUserInterface" as CFString, kCFBooleanTrue)
     }
 
     static func focusedElement(pid: pid_t) -> AXUIElement? {
-        element(AXUIElementCreateApplication(pid), kAXFocusedUIElementAttribute)
+        let app = AXUIElementCreateApplication(pid)
+        setTimeout(app)
+        guard let focused = element(app, kAXFocusedUIElementAttribute) else { return nil }
+        setTimeout(focused)
+        return focused
     }
 
     static func descriptor(_ element: AXUIElement) -> FieldDescriptor {
@@ -108,13 +118,18 @@ enum AX {
         var positionValue: AnyObject?
         var sizeValue: AnyObject?
         guard AXUIElementCopyAttributeValue(element, kAXPositionAttribute as CFString, &positionValue) == .success,
-              AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) == .success
+              AXUIElementCopyAttributeValue(element, kAXSizeAttribute as CFString, &sizeValue) == .success,
+              let positionValue, CFGetTypeID(positionValue) == AXValueGetTypeID(),
+              let sizeValue, CFGetTypeID(sizeValue) == AXValueGetTypeID()
         else { return nil }
         var position = CGPoint.zero
         var size = CGSize.zero
-        AXValueGetValue(positionValue as! AXValue, .cgPoint, &position)
-        AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
-        guard size.width > 0, size.height > 0, let primary = NSScreen.screens.first else { return nil }
+        guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &position),
+              AXValueGetValue(sizeValue as! AXValue, .cgSize, &size),
+              position.x.isFinite, position.y.isFinite,
+              size.width.isFinite, size.height.isFinite,
+              size.width > 0, size.height > 0,
+              let primary = NSScreen.screens.first else { return nil }
         return CGRect(x: position.x, y: primary.frame.maxY - position.y - size.height,
                       width: size.width, height: size.height)
     }

@@ -380,7 +380,7 @@ enum Demo {
         suggestions.site = "github.com"
         suggestions.generated = generate()
         suggestions.existing = AppModel.shared.siteAddresses
-        show(MenuView(model: .shared)
+        show(MenuView(model: .shared, autocomplete: .shared, switcher: .shared, duo: .shared, duoPrefs: .shared, snow: .shared)
             .background(.windowBackground, in: .rect(cornerRadius: 18)), at: CGPoint(x: 80, y: 120))
         show(SuggestionView(state: suggestions, onCreate: {}, onPick: { _ in })
             .background(.windowBackground, in: .rect(cornerRadius: 15)), at: CGPoint(x: 460, y: 500))

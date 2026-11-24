@@ -1,0 +1,124 @@
+import Foundation
+
+/// The rules for when the fold is on screen. Pure, so it can be tested
+/// without a lid.
+public struct FoldDecider: Sendable {
+
+    public enum Phase: Sendable, Equatable {
+        /// Nothing is happening.
+        case idle
+        /// The lid is closing towards the start angle: capture is warming up.
+        case armed
+        /// The fold is on screen.
+        case active
+    }
+
+    public var startAngle: Double
+    /// Degrees above the start angle the lid must open to before release.
+    public var hysteresis: Double = 4
+    /// Degrees above the start angle where warming up begins.
+    public var armCeiling: Double = 70
+    /// How long after the last closing movement the fold may still start.
+    public var closingMemory: TimeInterval = 1.5
+    /// The fold stays up at least this long once started.
+    public var minimumDuration: TimeInterval = 0.35
+    /// Degrees the lid must close from where it last rested before capture
+    /// warms or a fold starts. A lid left by the start angle wobbles when the
+    /// Mac is typed on or swiped across; that is not someone closing it.
+    public var minimumTravel: Double = 2
+    /// A fold whose lid is back above the start angle shows nothing. Once
+    /// the lid has stayed there this long the fold lets go, hysteresis or
+    /// not, so the overlay never holds the screen for nothing.
+    public var releaseDelay: TimeInterval = 0.6
+    /// A lid that stops below the start angle and stays there is a lid
+    /// someone is working at, not one being closed. Once it has stayed within
+    /// `settleTolerance` degrees for `settleDelay` the fold lets go; closing
+    /// it further by `minimumTravel` folds again.
+    public var settleDelay: TimeInterval = 1.5
+    public var settleTolerance: Double = 1.5
+
+    public private(set) var phase: Phase = .idle
+    public private(set) var activatedAt: TimeInterval = -.infinity
+    /// Where the lid rested before its latest closing movement. `nil` until
+    /// the next sample, after a reset.
+    public private(set) var restAngle: Double?
+    private var aboveStartSince: TimeInterval?
+    private var settle: (angle: Double, since: TimeInterval)?
+
+    public init(startAngle: Double) {
+        self.startAngle = startAngle
+    }
+
+    /// Feeds one sample. Returns the phase after it.
+    @discardableResult
+    public mutating func update(tracker: AngleTracker, enabled: Bool, time: TimeInterval) -> Phase {
+        guard enabled else {
+            phase = .idle
+            restAngle = nil
+            return phase
+        }
+        let angle = tracker.angle
+        switch phase {
+        case .active:
+            if let settle, abs(angle - settle.angle) <= settleTolerance {
+                if time - settle.since >= settleDelay {
+                    release(at: angle)
+                    return phase
+                }
+            } else {
+                settle = (angle, time)
+            }
+            if time - activatedAt < minimumDuration { return phase }
+            if angle >= startAngle + hysteresis {
+                release(at: angle)
+            } else if angle > startAngle {
+                let since = aboveStartSince ?? time
+                aboveStartSince = since
+                if time - since >= releaseDelay { release(at: angle) }
+            } else {
+                aboveStartSince = nil
+            }
+        case .armed, .idle:
+            let closing = tracker.isClosing(at: time, within: closingMemory)
+            let activelyOpening = tracker.velocity >= tracker.closingSpeed
+            // The rest angle follows the lid until it starts closing, then
+            // holds the highest point of the movement.
+            let rest = (closing && !activelyOpening) ? max(restAngle ?? angle, angle) : angle
+            restAngle = rest
+            let predicted = tracker.predictedAngle(at: time)
+            let travelled = rest - min(angle, predicted) >= minimumTravel
+            if closing, !activelyOpening, travelled, predicted <= startAngle {
+                phase = .active
+                activatedAt = time
+                aboveStartSince = nil
+                settle = (angle, time)
+            } else if closing, !activelyOpening, travelled, angle <= startAngle + armCeiling {
+                phase = .armed
+            } else {
+                phase = .idle
+            }
+        }
+        return phase
+    }
+
+    private mutating func release(at angle: Double) {
+        phase = .idle
+        restAngle = angle
+        aboveStartSince = nil
+        settle = nil
+    }
+
+    public mutating func forceIdle() {
+        phase = .idle
+        restAngle = nil
+        aboveStartSince = nil
+        settle = nil
+    }
+
+    public mutating func forceActive(at time: TimeInterval) {
+        phase = .active
+        activatedAt = time
+        aboveStartSince = nil
+        settle = nil
+    }
+}

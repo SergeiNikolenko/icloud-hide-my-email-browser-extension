@@ -20,8 +20,8 @@ func render(size: CGFloat) -> Data {
         NSGraphicsContext.current?.restoreGraphicsState()
 
         NSGradient(colors: [
-            NSColor(srgbRed: 0.36, green: 0.78, blue: 1.0, alpha: 1),
-            NSColor(srgbRed: 0.0, green: 0.45, blue: 0.98, alpha: 1),
+            NSColor(srgbRed: 0.25, green: 0.62, blue: 1.0, alpha: 1),
+            NSColor(srgbRed: 0.22, green: 0.24, blue: 0.86, alpha: 1),
         ])!.draw(in: path, angle: -90)
 
         // Soft specular highlight across the top, as on glass icons.
@@ -31,13 +31,22 @@ func render(size: CGFloat) -> Data {
             .draw(in: NSRect(x: shape.minX, y: shape.midY, width: shape.width, height: shape.height / 2), angle: -90)
         NSGraphicsContext.current?.restoreGraphicsState()
 
-        let configuration = NSImage.SymbolConfiguration(pointSize: shape.width * 0.46, weight: .medium)
+        let primaryConfig = NSImage.SymbolConfiguration(pointSize: shape.width * 0.40, weight: .medium)
             .applying(.init(paletteColors: [.white, .white]))
-        if let symbol = NSImage(systemSymbolName: "envelope.badge.shield.half.filled", accessibilityDescription: nil)?
-            .withSymbolConfiguration(configuration) {
+        if let symbol = NSImage(systemSymbolName: "keyboard.badge.ellipsis", accessibilityDescription: nil)?
+            .withSymbolConfiguration(primaryConfig) {
             let symbolSize = symbol.size
-            symbol.draw(in: NSRect(x: rect.midX - symbolSize.width / 2, y: rect.midY - symbolSize.height / 2,
+            symbol.draw(in: NSRect(x: rect.midX - symbolSize.width / 2, y: rect.midY - symbolSize.height * 0.25,
                                    width: symbolSize.width, height: symbolSize.height))
+        }
+
+        let badgeConfig = NSImage.SymbolConfiguration(pointSize: shape.width * 0.21, weight: .semibold)
+            .applying(.init(paletteColors: [NSColor.white.withAlphaComponent(0.95), NSColor(srgbRed: 0.68, green: 0.92, blue: 1.0, alpha: 1)]))
+        if let shield = NSImage(systemSymbolName: "envelope.badge.shield.half.filled", accessibilityDescription: nil)?
+            .withSymbolConfiguration(badgeConfig) {
+            let s = shield.size
+            shield.draw(in: NSRect(x: rect.midX - s.width / 2, y: shape.minY + shape.height * 0.14,
+                                   width: s.width, height: s.height))
         }
         return true
     }

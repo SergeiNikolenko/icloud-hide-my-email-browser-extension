@@ -1,36 +1,78 @@
 import AppKit
 import HideMyEmailCore
+import LayoutSwitcherCore
 import SafariServices
+import SnowpileCore
 import SwiftUI
+
+private enum MenuWorkspace: String, CaseIterable {
+    case switcher
+    case hideMyEmail
+    case duo
+    case snow
+}
 
 struct MenuView: View {
     let model: AppModel
+    let autocomplete: AutocompleteController
+    let switcher: SwitcherController
+    let duo: DuoFoldController
+    @Bindable var duoPrefs: DuoPreferences
+    @ObservedObject var snow: SnowpileController
     @Environment(\.openWindow) private var openWindow
     @Environment(\.openSettings) private var openSettings
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("menu.selectedWorkspace") private var workspace: MenuWorkspace = .switcher
+    @AppStorage("settings.selectedTab") private var selectedSettingsTab: String = SettingsTab.general.rawValue
     @State private var query = ""
+    @State private var isAccessibilityTrusted = true
 
     // The menu bar window already sits on Liquid Glass, so its content uses
     // plain sections and keeps glass for controls only.
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             header
-            switch model.state {
-            case .unknown:
-                ProgressView()
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity, minHeight: 120)
-            case .signedOut:
-                SignedOutModule(model: model)
-            case .signedIn:
-                GeneratorModule(model: model) { text in
-                    dismiss()
-                    AppDelegate.paste(text, into: model.context)
-                }
-                Divider()
-                addressesModule
+            Picker("", selection: $workspace) {
+                Text("Typing").tag(MenuWorkspace.switcher)
+                Text("Mail").tag(MenuWorkspace.hideMyEmail)
+                Text("Duo").tag(MenuWorkspace.duo)
+                Text("Snow").tag(MenuWorkspace.snow)
             }
-            if !AX.isTrusted {
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(maxWidth: .infinity)
+
+            switch workspace {
+            case .switcher:
+                SwitcherMenuModule(switcher: switcher, onDismiss: { dismiss() })
+                Divider()
+                AutocompleteModule(
+                    autocomplete: autocomplete,
+                    onOpenAutocompleteSettings: { openAppSettings(tab: .autocomplete) },
+                    onDismiss: { dismiss() }
+                )
+            case .hideMyEmail:
+                switch model.state {
+                case .unknown:
+                    ProgressView()
+                        .controlSize(.small)
+                        .frame(maxWidth: .infinity, minHeight: 120)
+                case .signedOut:
+                    SignedOutModule(model: model)
+                case .signedIn:
+                    GeneratorModule(model: model) { text in
+                        dismiss()
+                        AppDelegate.paste(text, into: model.context)
+                    }
+                    Divider()
+                    addressesModule
+                }
+            case .duo:
+                DuoMenuModule(controller: duo, prefs: duoPrefs, onDismiss: { dismiss() })
+            case .snow:
+                SnowMenuModule(controller: snow, prefs: snow.preferences, weather: snow.weather)
+            }
+            if !isAccessibilityTrusted {
                 Divider()
                 AccessibilityModule()
             }
@@ -38,16 +80,23 @@ struct MenuView: View {
             footer
         }
         .padding(14)
-        .frame(width: 340)
-        .task { if model.state == .signedIn { await model.refresh() } }
+        .frame(width: 384)
+        .task {
+            isAccessibilityTrusted = AX.isTrusted
+            switcher.refreshSecureInputState()
+            if model.state == .signedIn { await model.refresh() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            isAccessibilityTrusted = AX.isTrusted
+        }
     }
 
     private var header: some View {
         HStack(spacing: 8) {
-            Text("Hide My Email")
+            Text("KeyVeil")
                 .font(.system(size: 13, weight: .bold))
             Spacer()
-            if model.isRefreshing {
+            if workspace == .hideMyEmail && model.isRefreshing {
                 ProgressView().controlSize(.mini)
             }
         }
@@ -128,13 +177,14 @@ struct MenuView: View {
 
     private var footer: some View {
         HStack(spacing: 6) {
-            Button { open("manager") } label: {
-                Label("Addresses", systemImage: "list.bullet")
+            if workspace == .hideMyEmail {
+                Button { open("manager") } label: {
+                    Label("Addresses", systemImage: "list.bullet")
+                }
+                .help("Addresses")
             }
-            .help("Addresses")
             Button {
-                NSApp.activate()
-                openSettings()
+                openAppSettings(tab: defaultSettingsTabForWorkspace)
             } label: {
                 Label("Settings", systemImage: "gearshape")
             }
@@ -149,6 +199,22 @@ struct MenuView: View {
         .buttonStyle(.glass)
         .buttonBorderShape(.circle)
         .controlSize(.large)
+    }
+
+    private var defaultSettingsTabForWorkspace: SettingsTab {
+        switch workspace {
+        case .switcher: return .switcher
+        case .hideMyEmail: return .mail
+        case .duo: return .duo
+        case .snow: return .snow
+        }
+    }
+
+    private func openAppSettings(tab: SettingsTab = .general) {
+        selectedSettingsTab = tab.rawValue
+        dismiss()
+        NSApp.activate()
+        openSettings()
     }
 
     private func open(_ id: String) {
@@ -448,7 +514,7 @@ private struct AccessibilityModule: View {
                 .font(.system(size: 15))
                 .foregroundStyle(.secondary)
                 .frame(width: 28)
-            Text("Allow Accessibility to fill email fields")
+            Text("Allow Accessibility for layout switching, email autofill, and autocomplete")
                 .font(.system(size: 12))
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
@@ -460,5 +526,172 @@ private struct AccessibilityModule: View {
             .controlSize(.small)
         }
         .padding(.horizontal, 4)
+    }
+}
+
+private struct AutocompleteModule: View {
+    let autocomplete: AutocompleteController
+    let onOpenAutocompleteSettings: () -> Void
+    let onDismiss: () -> Void
+
+    private var isModelLoaded: Bool {
+        if case .ready = autocomplete.engineState { return true }
+        return false
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 10) {
+                SymbolBadge(systemName: "sparkles", size: 34)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Autocomplete & Polish")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text(statusSubtitle)
+                        .font(.system(size: 11))
+                        .foregroundStyle(statusColor)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                if isModelLoaded {
+                    Button {
+                        autocomplete.unloadModelNow()
+                    } label: {
+                        Image(systemName: "eject.fill")
+                            .font(.system(size: 10))
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.mini)
+                    .help("Unload model from memory")
+                }
+                Toggle("", isOn: Binding(
+                    get: { autocomplete.preferences.isEnabled },
+                    set: { autocomplete.setEnabled($0) }
+                ))
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .controlSize(.small)
+            }
+
+            if case .noModel = autocomplete.engineState, autocomplete.preferences.isEnabled || autocomplete.preferences.polishEnabled {
+                Button("Choose or Download Model…") {
+                    onOpenAutocompleteSettings()
+                }
+                .buttonStyle(.glass)
+                .controlSize(.small)
+            } else {
+                HStack(spacing: 6) {
+                    if autocomplete.preferences.polishEnabled {
+                        Button {
+                            onDismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
+                                autocomplete.polishCurrentField()
+                            }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: "wand.and.stars")
+                                    .font(.system(size: 11))
+                                Text("Polish Text")
+                                    .font(.system(size: 11.5, weight: .medium))
+                                if let badge = autocomplete.preferences.polishShortcut.badge {
+                                    Text(badge)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.glass)
+                        .controlSize(.small)
+                        .disabled(autocomplete.isPolishing)
+                    }
+
+                    if autocomplete.preferences.isEnabled,
+                       let bundleID = autocomplete.lastExternalBundleID,
+                       let appName = autocomplete.lastExternalAppName {
+                        let paused = autocomplete.isAppExcluded(bundleID)
+                        Button {
+                            autocomplete.toggleExcluded(bundleID: bundleID)
+                        } label: {
+                            Image(systemName: paused ? "play.fill" : "pause.fill")
+                                .font(.system(size: 10))
+                        }
+                        .buttonStyle(.glass)
+                        .controlSize(.small)
+                        .help(paused
+                              ? String(localized: "Resume in \(appName)")
+                              : String(localized: "Pause in \(appName)"))
+
+                        if !paused && autocomplete.preferences.personalizationStrength != .off {
+                            let learningPaused = autocomplete.isLearningExcluded(bundleID)
+                            Button {
+                                autocomplete.toggleLearningExcluded(bundleID: bundleID)
+                            } label: {
+                                Image(systemName: learningPaused ? "eye.slash.fill" : "brain")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(learningPaused ? .orange : .primary)
+                            }
+                            .buttonStyle(.glass)
+                            .controlSize(.small)
+                            .help(learningPaused
+                                  ? String(localized: "Resume learning in \(appName)")
+                                  : String(localized: "Don't learn in \(appName)"))
+                        }
+                    }
+                }
+
+                if autocomplete.preferences.polishEnabled {
+                    @Bindable var autoPrefs = autocomplete.preferences
+                    HStack(spacing: 8) {
+                        Text("Auto-Fix Caps, Commas & Typos")
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                        Spacer(minLength: 8)
+                        Toggle("", isOn: $autoPrefs.autoPolishEnabled)
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .controlSize(.mini)
+                    }
+                    .padding(.top, 2)
+                }
+            }
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private var statusColor: Color {
+        if autocomplete.isSecureInputActive { return .orange }
+        switch autocomplete.engineState {
+        case .disabled: return .secondary
+        case .noModel: return .orange
+        case .idle: return .secondary
+        case .loading: return .accentColor
+        case .ready: return .green
+        case .error: return .red
+        }
+    }
+
+    private var statusSubtitle: String {
+        if autocomplete.isSecureInputActive && autocomplete.preferences.isEnabled {
+            return String(localized: "Paused (Secure Input)")
+        }
+        switch autocomplete.engineState {
+        case .disabled:
+            return String(localized: "Off")
+        case .noModel:
+            return String(localized: "No local GGUF model found")
+        case .idle(let name):
+            return String(localized: "\(name) · Unloaded (0 MB)")
+        case .loading(let name):
+            return String(localized: "Loading \(name)…")
+        case .ready(let name, let usingGPU):
+            let hw = usingGPU ? "GPU" : "CPU"
+            if let mb = autocomplete.loadedMemoryMB {
+                return "\(name) · ~\(mb) MB · \(hw)"
+            }
+            return "\(name) · \(hw)"
+        case .error(let message):
+            return message
+        }
     }
 }

@@ -1,23 +1,29 @@
 #!/bin/bash
-# Builds "Hide My Email.app" into macos/build and signs it with the first
+# Builds "KeyVeil.app" into macos/build and signs it with the first
 # Apple Development identity, so the Accessibility permission survives rebuilds
 # and updates.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+./scripts/fetch-llama.sh
 swift build -c release --arch arm64 --arch x86_64
 BIN_DIR=$(swift build -c release --arch arm64 --arch x86_64 --show-bin-path)
 # Assemble and sign outside the project: synced folders such as ~/Documents add
 # Finder attributes that codesign rejects.
 STAGING=$(mktemp -d)
 trap 'timeout 30 /usr/bin/trash "$STAGING"' EXIT
-APP="$STAGING/Hide My Email.app"
+APP="$STAGING/KeyVeil.app"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
-cp -f "$BIN_DIR/HideMyEmail" "$APP/Contents/MacOS/HideMyEmail"
-install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/HideMyEmail"
+cp -f "$BIN_DIR/KeyVeil" "$APP/Contents/MacOS/KeyVeil"
+install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/KeyVeil"
 ditto "$BIN_DIR/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
+ditto "$BIN_DIR/llama.framework" "$APP/Contents/Frameworks/llama.framework"
 cp -f Resources/Info.plist "$APP/Contents/Info.plist"
 cp -R Resources/en.lproj Resources/ru.lproj "$APP/Contents/Resources/"
+cp -f Sources/LayoutSwitcherCore/Resources/logos.lzfse "$APP/Contents/Resources/logos.lzfse"
+if [ -d "$BIN_DIR/KeyVeil_LayoutSwitcherCore.bundle" ]; then
+  ditto "$BIN_DIR/KeyVeil_LayoutSwitcherCore.bundle" "$APP/Contents/Resources/KeyVeil_LayoutSwitcherCore.bundle"
+fi
 
 if [ ! -f Resources/AppIcon.icns ]; then
   WORK="$STAGING/icon"
@@ -56,15 +62,18 @@ FRAMEWORK="$APP/Contents/Frameworks/Sparkle.framework"
 find "$FRAMEWORK/Versions/B" -depth \( -name '*.xpc' -o -name '*.app' \) -print0 | xargs -0 -n1 "${SIGN[@]}"
 "${SIGN[@]}" "$FRAMEWORK/Versions/B/Autoupdate"
 "${SIGN[@]}" "$FRAMEWORK"
+if [ -d "$APP/Contents/Frameworks/llama.framework" ]; then
+  "${SIGN[@]}" "$APP/Contents/Frameworks/llama.framework"
+fi
 "${SIGN[@]}" --entitlements SafariExtension/Extension.entitlements "$APPEX"
 "${SIGN[@]}" --entitlements Resources/HideMyEmail.entitlements "$APP"
 codesign --verify --deep --strict "$APP"
-if [ -d "build/Hide My Email.app" ]; then
-  timeout 30 /usr/bin/trash "build/Hide My Email.app"
+if [ -d "build/KeyVeil.app" ]; then
+  timeout 30 /usr/bin/trash "build/KeyVeil.app"
 fi
 mkdir -p build
-ditto --norsrc --noextattr --noqtn "$APP" "build/Hide My Email.app"
+ditto --norsrc --noextattr --noqtn "$APP" "build/KeyVeil.app"
 # File-provider folders may add Finder metadata after the staging signature.
-xattr -dr com.apple.FinderInfo "build/Hide My Email.app"
-codesign --verify --deep --strict "build/Hide My Email.app"
-echo "Built build/Hide My Email.app"
+xattr -cr "build/KeyVeil.app"
+codesign --verify --deep --strict "build/KeyVeil.app"
+echo "Built build/KeyVeil.app"

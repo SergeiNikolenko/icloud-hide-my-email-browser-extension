@@ -1,13 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Hide My Email",
-  "description": "Shares your iCloud.com sign-in with the Hide My Email app.",
+  "name": "KeyVeil — Hide My Email",
+  "description": "Shares your iCloud.com sign-in with KeyVeil (Hide My Email).",
   "version": "1.0",
   "background": {
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Hide My Email",
+    "default_title": "KeyVeil — Hide My Email",
     "default_icon": "icon-48.png"
   },
   "icons": {

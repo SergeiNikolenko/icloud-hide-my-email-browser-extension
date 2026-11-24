@@ -48,7 +48,10 @@ final class SuggestionPanel {
 
     private let model = AppModel.shared
 
+    var isVisible: Bool { panel.isVisible }
+
     func show(for element: AXUIElement, anchor: CGRect) {
+        AutocompleteController.shared.dismissSuggestion()
         let isSameField = field.map { CFEqual($0, element) } ?? false
         field = element
         self.anchor = anchor
